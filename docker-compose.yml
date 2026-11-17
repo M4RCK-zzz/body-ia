@@ -1,0 +1,40 @@
+name: bodyvision
+
+services:
+  db:
+    image: postgres:16.6
+    container_name: bodyvision-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bodyvision}
+      POSTGRES_USER: ${POSTGRES_USER:-bodyvision}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env de la raíz}
+    ports:
+      # Solo accesible desde la propia máquina
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - bodyvision_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Servicio auxiliar opcional: docker compose --profile tools up -d
+  pgadmin:
+    image: dpage/pgadmin4:8.14
+    container_name: bodyvision-pgadmin
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-change-this-local-password}
+    ports:
+      - "127.0.0.1:5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  bodyvision_pgdata:
