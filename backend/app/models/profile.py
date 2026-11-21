@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import CheckConstraint, DateTime, String, func
+from sqlalchemy import CheckConstraint, DateTime, String, func,ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.clock import utcnow
 from app.db.base import Base
@@ -26,3 +26,7 @@ class Profile(Base):
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, server_default=func.now()
     )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )

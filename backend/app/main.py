@@ -1,17 +1,21 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.routes import api_router
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import register_request_id_middleware
+from app.core.security_errors import register_security_handlers
 from app.core.validation import register_validation_handler
 from app.db.session import engine
 
 logger = logging.getLogger(__name__)
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
@@ -48,7 +52,9 @@ def create_app() -> FastAPI:
     )
     register_exception_handlers(app)
     register_validation_handler(app)
+    register_security_handlers(app)
     app.include_router(api_router, prefix="/api")
     return app
+
 
 app = create_app()

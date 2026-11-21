@@ -1,0 +1,88 @@
+.bv-auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.bv-auth-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 14px;
+}
+.bv-auth-card h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+}
+.bv-auth-sub {
+  margin: 0;
+  opacity: 0.75;
+}
+.bv-auth-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.bv-auth-card input {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.bv-auth-card button[type="submit"] {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bv-auth-card button[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.bv-auth-error {
+  margin: 0;
+  color: #e5484d;
+  font-size: 0.9rem;
+}
+.bv-auth-switch,
+.bv-auth-note {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+.bv-auth-note {
+  font-size: 0.78rem;
+  opacity: 0.65;
+}
+.bv-auth-status {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 48px 16px;
+}
+.bv-usermenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+.bv-usermenu small {
+  display: block;
+  opacity: 0.7;
+}
+.bv-usermenu button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}

@@ -32,3 +32,7 @@ class Measurement(Base):
         ForeignKey("measurements.id", ondelete="RESTRICT"), unique=True
     )
     correction_reason: Mapped[str | None] = mapped_column(String(300))
+
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )

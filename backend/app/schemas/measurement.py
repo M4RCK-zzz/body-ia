@@ -22,7 +22,7 @@ class MeasurementCreate(BaseModel):
     unit: MeasurementUnit
     measured_at: AwareDatetime
     method: MeasurementMethod
-    created_by: str = Field(min_length=2, max_length=120)
+    
     notes: str | None = Field(default=None, max_length=500)
 
     _notes_blank = field_validator("notes")(_blank_to_none)
@@ -33,7 +33,7 @@ class MeasurementCorrect(BaseModel):
     value: InputValue
     measured_at: AwareDatetime | None = None
     method: MeasurementMethod | None = None
-    created_by: str = Field(min_length=2, max_length=120)
+    
     reason: str = Field(min_length=3, max_length=300)
     notes: str | None = Field(default=None, max_length=500)
 

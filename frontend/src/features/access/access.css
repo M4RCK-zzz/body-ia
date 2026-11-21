@@ -1,0 +1,45 @@
+﻿.access-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.access-panel__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.access-panel__form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.access-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.access-panel th,
+.access-panel td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #e2e2e2;
+}
+
+.access-panel__error {
+  color: #b42318;
+}
+
+.access-badge {
+  display: inline-block;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: #eef2f7;
+}
+
+.access-badge--owner { background: #dbeafe; }
+.access-badge--editor { background: #dcfce7; }
+.access-badge--viewer { background: #f1f5f9; }

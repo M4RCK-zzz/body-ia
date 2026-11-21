@@ -33,3 +33,55 @@ Nunca se mezclan en API ni UI; cada dato mostrado lleva su etiqueta (`DataKindBa
 - Cola de workers (Fase 5) respaldada por PostgreSQL (`FOR UPDATE SKIP LOCKED`), sin Redis.
 - Almacenamiento de medios (Fase 4) tras una interfaz `StorageBackend`.
 - Python 3.11 fijo por compatibilidad futura con MediaPipe en Windows.
+## ADR-003 · Identidad, RBAC y auditoría append-only (Fase 3A)
+- **Autenticación:** JWT de acceso de corta vida (30 min). El token solo identifica (`sub`); roles y estado de la cuenta se consultan en BD en cada petición.
+- **Contraseñas:** Argon2id. Política técnica mínima (10+ caracteres, letra y número).
+- **Fuerza bruta:** bloqueo temporal por cuenta tras N fallos; respuesta uniforme para no permitir enumeración de cuentas.
+- **RBAC:** `admin`, `professional`, `user`. `admin` gestiona cuentas, no obtiene acceso implícito a expedientes.
+- **Auditoría:** `audit_events` es append-only (trigger `BEFORE UPDATE OR DELETE`).
+- **Límites conocidos:** sin refresh token ni revocación en servidor; token en `sessionStorage`; sin rate limiting por IP.
+## ADR-004: Acceso por expediente, consentimiento y auditoría de denegaciones
+
+**Estado:** Aceptada (Fase 3B)
+
+### Contexto
+
+Tras la Fase 3A existe identidad (usuarios, roles, auditoría), pero los expedientes y sus mediciones no tienen propietario ni control de acceso, y no hay consentimiento registrado. Los documentos de referencia exigen consentimiento válido antes de capturar o registrar datos y trazabilidad sin sobrescritura.
+
+### Decisiones
+
+1. **Propiedad y niveles.** Cada expediente tiene un `owner_id` (`NOT NULL`) y concesiones en `profile_access` con niveles `owner`, `editor` y `viewer`. Un único propietario activo por expediente (índice parcial único).
+2. **Sin acceso implícito para `admin`.** El rol administra cuentas, no datos.
+3. **404 frente a 403.** Sin concesión activa → `404` (no revela existencia). Con concesión insuficiente → `403 insufficient_access`.
+4. **Concesión por email** a cualquier cuenta activa (no se exige rol `professional`). Solo el propietario concede y revoca. No se puede conceder `owner`, ni a uno mismo, ni revocar al propietario. Cambiar de nivel revoca la fila anterior y crea otra (queda historial). La revocación es inmediata porque el acceso se lee de BD en cada petición.
+5. **Consentimiento** (`consents`: finalidad, versión, quién y cuándo aceptó, revocación). Solo el propietario acepta o revoca. Aceptar la misma versión es idempotente; una versión nueva revoca la anterior. Un trigger de BD impide borrar filas y modificar nada salvo `revoked_at`/`revoked_by`; la revocación es definitiva.
+6. **Efecto del consentimiento:** sin consentimiento vigente, registrar o corregir mediciones devuelve `422 consent_required`. Las lecturas siguen permitidas para poder consultar y gestionar el expediente.
+7. **Auditoría ampliada:** todas las escrituras y los accesos denegados (`access.denied`, con motivo `no_access` o `insufficient_level`). Las lecturas normales no se auditan.
+8. **Autoría del servidor.** `created_by` deja de venir del cliente: es una instantánea de `actor.full_name`, y `created_by_user_id` guarda la referencia. Enviar `created_by` produce `422` (`extra=forbid`).
+9. **Migración 0004** aborta si existen expedientes sin propietario; se resuelve con `reset-dev-data.ps1` (solo desarrollo).
+
+### Permisos
+
+| Acción | viewer | editor | owner |
+|---|:---:|:---:|:---:|
+| Ver expediente, mediciones, historial | ✔ | ✔ | ✔ |
+| Registrar / corregir mediciones* | ✘ | ✔ | ✔ |
+| Renombrar, archivar, restaurar | ✘ | ✘ | ✔ |
+| Gestionar accesos y consentimiento | ✘ | ✘ | ✔ |
+
+*\* Requiere expediente activo y consentimiento vigente.*
+
+### Compromisos conocidos (aceptados por ahora)
+
+* `display_code` sigue siendo único global: un `409` revela que el seudónimo existe en otra cuenta. Se puede pasar a unicidad por propietario más adelante.
+* Conceder por email devuelve `404` si la cuenta no existe: un usuario autenticado puede enumerar cuentas (igual que el `409` de registro, ADR-003).
+* Las denegaciones solo se auditan si el expediente existe; el sondeo con UUID aleatorios no se registra.
+* El texto de consentimiento es un **borrador pendiente de revisión legal** (Ley 29733); no debe usarse con datos reales sin esa revisión.
+* No hay transferencia de propiedad.
+* No hay limitación de intentos por IP ni revocación de tokens en servidor.
+
+### Consecuencias
+
+* Los servicios reciben siempre `actor` como primer parámetro y delegan la autorización en `AccessGuard`.
+* `ProfileRepository.list_page` se sustituye por `list_accessible`, que solo devuelve expedientes con concesión activa.
+* Las fases de captura y análisis (4 y 5) reutilizarán `AccessGuard` y `ConsentService.ensure_valid`.

@@ -1,32 +1,50 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import AwareDatetime
+
 from app.api.deps import get_measurement_service
+from app.api.security import CurrentUser
 from app.domain.measurements import MeasurementCorrection, MeasurementType, NewMeasurement
 from app.schemas.common import Page
 from app.schemas.measurement import (
-    MeasurementCorrect, MeasurementCreate, MeasurementRead, MeasurementSeriesRead, SeriesPoint,
+    MeasurementCorrect,
+    MeasurementCreate,
+    MeasurementRead,
+    MeasurementSeriesRead,
+    SeriesPoint,
 )
 from app.services.measurement_service import MeasurementService, MeasurementView
 
 router = APIRouter(prefix="/profiles/{profile_id}/measurements", tags=["Mediciones"])
+
 
 def _to_read(view: MeasurementView) -> MeasurementRead:
     return MeasurementRead.model_validate(view.measurement).model_copy(
         update={"is_current": view.is_current}
     )
 
+
 @router.post("", response_model=MeasurementRead, status_code=status.HTTP_201_CREATED)
 def record_measurement(
     profile_id: UUID,
     payload: MeasurementCreate,
+    user: CurrentUser,
     service: MeasurementService = Depends(get_measurement_service),
 ) -> MeasurementRead:
-    return _to_read(service.record(profile_id, NewMeasurement(**payload.model_dump())))
+    return _to_read(
+        service.record(
+            user,
+            profile_id,
+            NewMeasurement(**payload.model_dump(), created_by=user.full_name),
+        )
+    )
+
 
 @router.get("", response_model=Page[MeasurementRead])
 def list_measurements(
     profile_id: UUID,
+    user: CurrentUser,
     metric_type: MeasurementType | None = None,
     include_superseded: bool = False,
     date_from: AwareDatetime | None = None,
@@ -36,6 +54,7 @@ def list_measurements(
     service: MeasurementService = Depends(get_measurement_service),
 ) -> Page[MeasurementRead]:
     views, total = service.list_measurements(
+        user,
         profile_id,
         metric_type=metric_type,
         include_superseded=include_superseded,
@@ -48,13 +67,15 @@ def list_measurements(
         items=[_to_read(v) for v in views], total=total, limit=limit, offset=offset
     )
 
+
 @router.get("/series", response_model=MeasurementSeriesRead)
 def get_series(
     profile_id: UUID,
+    user: CurrentUser,
     metric_type: MeasurementType = Query(...),
     service: MeasurementService = Depends(get_measurement_service),
 ) -> MeasurementSeriesRead:
-    data = service.series(profile_id, metric_type)
+    data = service.series(user, profile_id, metric_type)
     return MeasurementSeriesRead(
         metric_type=data.metric_type,
         unit=data.unit,
@@ -70,21 +91,26 @@ def get_series(
         ],
     )
 
+
 @router.get("/{measurement_id}", response_model=MeasurementRead)
 def get_measurement(
     profile_id: UUID,
     measurement_id: UUID,
+    user: CurrentUser,
     service: MeasurementService = Depends(get_measurement_service),
 ) -> MeasurementRead:
-    return _to_read(service.get(profile_id, measurement_id))
+    return _to_read(service.get(user, profile_id, measurement_id))
+
 
 @router.get("/{measurement_id}/history", response_model=list[MeasurementRead])
 def get_measurement_history(
     profile_id: UUID,
     measurement_id: UUID,
+    user: CurrentUser,
     service: MeasurementService = Depends(get_measurement_service),
 ) -> list[MeasurementRead]:
-    return [_to_read(v) for v in service.history(profile_id, measurement_id)]
+    return [_to_read(v) for v in service.history(user, profile_id, measurement_id)]
+
 
 @router.post(
     "/{measurement_id}/corrections",
@@ -95,7 +121,8 @@ def correct_measurement(
     profile_id: UUID,
     measurement_id: UUID,
     payload: MeasurementCorrect,
+    user: CurrentUser,
     service: MeasurementService = Depends(get_measurement_service),
 ) -> MeasurementRead:
-    correction = MeasurementCorrection(**payload.model_dump())
-    return _to_read(service.correct(profile_id, measurement_id, correction))
+    correction = MeasurementCorrection(**payload.model_dump(), created_by=user.full_name)
+    return _to_read(service.correct(user, profile_id, measurement_id, correction))

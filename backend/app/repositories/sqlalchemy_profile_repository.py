@@ -6,6 +6,7 @@ from app.core.errors import ConflictError
 from app.domain.profiles import ProfileStatus
 from app.models.profile import Profile
 from app.repositories.profile_repository import ProfileRepository
+from app.models.access import ProfileAccess
 
 class SqlAlchemyProfileRepository(ProfileRepository):
     def __init__(self, session: Session) -> None:
@@ -28,20 +29,19 @@ class SqlAlchemyProfileRepository(ProfileRepository):
             raise ConflictError("Ya existe un expediente con ese código.") from exc
         return profile
 
-    def list_page(
-        self, *, status: ProfileStatus | None, limit: int, offset: int
-    ) -> tuple[list[Profile], int]:
-        conditions = []
+def list_accessible(
+        self, *, user_id: UUID, status: ProfileStatus | None, limit: int, offset: int
+    ) -> tuple[list[tuple[Profile, str]], int]:
+        conditions = [ProfileAccess.user_id == user_id, ProfileAccess.revoked_at.is_(None)]
         if status is not None:
             conditions.append(Profile.status == status.value)
-        total = self._session.scalar(
-            select(func.count()).select_from(Profile).where(*conditions)
-        ) or 0
-        stmt = (
-            select(Profile)
+        base = (
+            select(Profile, ProfileAccess.level)
+            .join(ProfileAccess, ProfileAccess.profile_id == Profile.id)
             .where(*conditions)
-            .order_by(Profile.created_at.desc(), Profile.id)
-            .limit(limit)
-            .offset(offset)
         )
-        return list(self._session.scalars(stmt)), total
+        total = self._session.scalar(select(func.count()).select_from(base.subquery())) or 0
+        rows = self._session.execute(
+            base.order_by(Profile.created_at.desc(), Profile.id).limit(limit).offset(offset)
+        ).all()
+        return [(profile, level) for profile, level in rows], total
