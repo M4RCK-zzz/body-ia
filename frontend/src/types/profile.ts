@@ -1,3 +1,5 @@
+﻿import type { AccessLevel } from "./access";
+
 export type ProfileStatus = "active" | "archived" | "restricted";
 
 export interface Profile {
@@ -7,6 +9,7 @@ export interface Profile {
   created_at: string;
   updated_at: string;
   archived_at: string | null;
+  my_access: AccessLevel;
 }
 
 export const PROFILE_STATUS_LABEL: Record<ProfileStatus, string> = {

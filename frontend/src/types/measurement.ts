@@ -1,4 +1,4 @@
-export type MeasurementType = "weight" | "height" | "waist" | "hip" | "chest" | "arm" | "thigh";
+﻿export type MeasurementType = "weight" | "height" | "waist" | "hip" | "chest" | "arm" | "thigh";
 export type MeasurementUnit = "kg" | "cm";
 export type MeasurementMethod =
   | "manual_tape"
@@ -33,6 +33,7 @@ export interface Measurement {
   unit: MeasurementUnit;
   measured_at: string;
   method: MeasurementMethod;
+  /** Lo fija el servidor: nombre de quien registró (se muestra como "Registrado por"). */
   created_by: string;
   notes: string | null;
   recorded_at: string;
@@ -63,7 +64,6 @@ export interface MeasurementCreatePayload {
   unit: MeasurementUnit;
   measured_at: string;
   method: MeasurementMethod;
-  created_by: string;
   notes?: string | null;
 }
 
@@ -71,7 +71,6 @@ export interface MeasurementCorrectionPayload {
   value: number;
   measured_at: string;
   method: MeasurementMethod;
-  created_by: string;
   reason: string;
   notes?: string | null;
 }

@@ -1,4 +1,5 @@
-import type { HealthResponse } from '@/types/health'
-import { request } from './httpClient'
+﻿import type { HealthResponse } from "@/types/health";
+import { apiRequest } from "./apiClient";
 
-export const getHealth = () => request<HealthResponse>('/api/health')
+export const getHealth = () =>
+  apiRequest<HealthResponse>("/api/health", { skipAuth: true, timeoutMs: 5000 });

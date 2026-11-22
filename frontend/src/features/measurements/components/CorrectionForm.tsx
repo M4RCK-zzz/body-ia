@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+﻿import { useState, type FormEvent } from "react";
 import { FormField } from "@/components/ui/FormField";
 import type { Measurement, MeasurementCatalog, MeasurementMethod, MetricSpec } from "@/types/measurement";
 import { formatValue, toLocalInputValue } from "../format";
@@ -17,14 +17,13 @@ export function CorrectionForm({ profileId, original, spec, catalog, onClose }: 
   const [value, setValue] = useState(String(original.value));
   const [measuredAt, setMeasuredAt] = useState(() => toLocalInputValue(new Date(original.measured_at)));
   const [method, setMethod] = useState<MeasurementMethod>(original.method);
-  const [createdBy, setCreatedBy] = useState("");
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState<InputErrors>({});
   const mutation = useCorrectMeasurement(profileId);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const found = validateInput({ value, measuredAt, createdBy, reason }, spec);
+    const found = validateInput({ value, measuredAt, reason }, spec);
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
@@ -35,7 +34,6 @@ export function CorrectionForm({ profileId, original, spec, catalog, onClose }: 
           value: parseDecimal(value),
           measured_at: new Date(measuredAt).toISOString(),
           method,
-          created_by: createdBy.trim(),
           reason: reason.trim(),
         },
       },
@@ -48,44 +46,66 @@ export function CorrectionForm({ profileId, original, spec, catalog, onClose }: 
       <h3>Corregir medición ({formatValue(original.value, original.unit)})</h3>
       <p className="bv-alert bv-alert--info">
         El valor original <strong>no se borra ni se sobrescribe</strong>: se crea una nueva versión
-        con tu nombre y el motivo, y la anterior queda en el historial.
+        a tu nombre con el motivo, y la anterior queda en el historial.
       </p>
       <div className="bv-row" style={{ marginTop: "0.75rem" }}>
         <FormField label={`Nuevo valor (${spec.unit})`} htmlFor="c-value" error={errors.value}>
-          <input id="c-value" className="bv-input" inputMode="decimal" value={value}
-            onChange={(e) => setValue(e.target.value)} />
+          <input
+            id="c-value"
+            className="bv-input"
+            inputMode="decimal"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
         </FormField>
         <FormField label="Fecha y hora" htmlFor="c-date" error={errors.measuredAt}>
-          <input id="c-date" type="datetime-local" className="bv-input" value={measuredAt}
-            max={toLocalInputValue(new Date())} onChange={(e) => setMeasuredAt(e.target.value)} />
+          <input
+            id="c-date"
+            type="datetime-local"
+            className="bv-input"
+            value={measuredAt}
+            max={toLocalInputValue(new Date())}
+            onChange={(e) => setMeasuredAt(e.target.value)}
+          />
         </FormField>
         <FormField label="Método" htmlFor="c-method">
-          <select id="c-method" className="bv-input" value={method}
-            onChange={(e) => setMethod(e.target.value as MeasurementMethod)}>
+          <select
+            id="c-method"
+            className="bv-input"
+            value={method}
+            onChange={(e) => setMethod(e.target.value as MeasurementMethod)}
+          >
             {catalog.methods.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
             ))}
           </select>
         </FormField>
       </div>
       <div className="bv-row" style={{ marginTop: "0.75rem" }}>
-        <FormField label="Quién corrige" htmlFor="c-by" error={errors.createdBy}>
-          <input id="c-by" className="bv-input" value={createdBy} maxLength={120}
-            onChange={(e) => setCreatedBy(e.target.value)} />
-        </FormField>
         <FormField label="Motivo de la corrección" htmlFor="c-reason" error={errors.reason}>
-          <input id="c-reason" className="bv-input" value={reason} maxLength={300}
-            onChange={(e) => setReason(e.target.value)} />
+          <input
+            id="c-reason"
+            className="bv-input"
+            value={reason}
+            maxLength={300}
+            onChange={(e) => setReason(e.target.value)}
+          />
         </FormField>
       </div>
       <div className="bv-actions" style={{ marginTop: "0.75rem" }}>
         <button type="submit" className="bv-btn bv-btn--primary" disabled={mutation.isPending}>
           {mutation.isPending ? "Guardando…" : "Guardar corrección"}
         </button>
-        <button type="button" className="bv-btn" onClick={onClose}>Cancelar</button>
+        <button type="button" className="bv-btn" onClick={onClose}>
+          Cancelar
+        </button>
       </div>
       {mutation.isError ? (
-        <p className="bv-alert bv-alert--error" role="alert">{mutation.error.message}</p>
+        <p className="bv-alert bv-alert--error" role="alert">
+          {mutation.error.message}
+        </p>
       ) : null}
     </form>
   );

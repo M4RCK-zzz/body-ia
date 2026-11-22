@@ -1,4 +1,4 @@
-import type { Measurement, MeasurementCatalog } from "@/types/measurement";
+﻿import type { Measurement, MeasurementCatalog } from "@/types/measurement";
 import { formatDateTime, formatValue, methodLabel } from "../format";
 
 interface Props {
@@ -18,6 +18,7 @@ export function MeasurementTable({ rows, catalog, readOnly, onCorrect, onHistory
   if (rows.length === 0) {
     return <p className="bv-muted">Aún no hay mediciones de esta métrica.</p>;
   }
+
   return (
     <div style={{ overflowX: "auto" }}>
       <table className="bv-table">
@@ -26,7 +27,7 @@ export function MeasurementTable({ rows, catalog, readOnly, onCorrect, onHistory
             <th>Fecha de medición</th>
             <th>Valor</th>
             <th>Método</th>
-            <th>Responsable</th>
+            <th>Registrado por</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -45,12 +46,20 @@ export function MeasurementTable({ rows, catalog, readOnly, onCorrect, onHistory
               <td className="no-strike">
                 <div className="bv-actions">
                   {m.is_current && !readOnly ? (
-                    <button type="button" className="bv-btn bv-btn--small" onClick={() => onCorrect(m)}>
+                    <button
+                      type="button"
+                      className="bv-btn bv-btn--small"
+                      onClick={() => onCorrect(m)}
+                    >
                       Corregir
                     </button>
                   ) : null}
                   {m.supersedes_id || !m.is_current ? (
-                    <button type="button" className="bv-btn bv-btn--small" onClick={() => onHistory(m)}>
+                    <button
+                      type="button"
+                      className="bv-btn bv-btn--small"
+                      onClick={() => onHistory(m)}
+                    >
                       Versiones
                     </button>
                   ) : null}

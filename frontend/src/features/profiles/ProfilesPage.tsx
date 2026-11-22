@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import "@/components/ui/forms.css";
 import type { ProfileStatus } from "@/types/profile";
 import { ProfileForm } from "./components/ProfileForm";
@@ -14,10 +14,16 @@ export function ProfilesPage() {
       <header className="bv-page__header">
         <div>
           <h1>Expedientes</h1>
-          <p className="bv-muted">Cada expediente agrupa el historial de mediciones reales de una persona.</p>
+          <p className="bv-muted">
+            Cada expediente agrupa el historial de mediciones reales de una persona.
+          </p>
         </div>
-        <select aria-label="Filtrar por estado" className="bv-input" value={filter}
-          onChange={(e) => setFilter(e.target.value as ProfileStatus | "all")}>
+        <select
+          aria-label="Filtrar por estado"
+          className="bv-input"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as ProfileStatus | "all")}
+        >
           <option value="active">Activos</option>
           <option value="archived">Archivados</option>
           <option value="all">Todos</option>
@@ -25,8 +31,8 @@ export function ProfilesPage() {
       </header>
 
       <p className="bv-alert bv-alert--warn">
-        Entorno de desarrollo: aún no hay autenticación ni consentimiento (Fase 3). No cargues
-        datos reales de personas.
+        Entorno de desarrollo: el texto de consentimiento es un borrador pendiente de revisión
+        legal. No cargues datos reales de personas.
       </p>
 
       <section className="bv-panel">

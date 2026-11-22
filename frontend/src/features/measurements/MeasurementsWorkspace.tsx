@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import type { Measurement, MeasurementCatalog, MeasurementType } from "@/types/measurement";
 import { CorrectionForm } from "./components/CorrectionForm";
 import { HistoryPanel } from "./components/HistoryPanel";
@@ -11,9 +11,10 @@ interface Props {
   profileId: string;
   catalog: MeasurementCatalog;
   readOnly: boolean;
+  readOnlyReason?: string;
 }
 
-export function MeasurementsWorkspace({ profileId, catalog, readOnly }: Props) {
+export function MeasurementsWorkspace({ profileId, catalog, readOnly, readOnlyReason }: Props) {
   const [metric, setMetric] = useState<MeasurementType>(catalog.metrics[0].metric_type);
   const [showReplaced, setShowReplaced] = useState(false);
   const [correcting, setCorrecting] = useState<Measurement | null>(null);
@@ -42,8 +43,13 @@ export function MeasurementsWorkspace({ profileId, catalog, readOnly }: Props) {
         </p>
         <div className="bv-tabs" role="group" aria-label="Métrica">
           {catalog.metrics.map((m) => (
-            <button key={m.metric_type} type="button" className="bv-tab"
-              aria-pressed={m.metric_type === metric} onClick={() => selectMetric(m.metric_type)}>
+            <button
+              key={m.metric_type}
+              type="button"
+              className="bv-tab"
+              aria-pressed={m.metric_type === metric}
+              onClick={() => selectMetric(m.metric_type)}
+            >
               {m.label}
             </button>
           ))}
@@ -52,7 +58,7 @@ export function MeasurementsWorkspace({ profileId, catalog, readOnly }: Props) {
 
       {readOnly ? (
         <p className="bv-alert bv-alert--warn">
-          Expediente no activo: el historial es de solo lectura. Restáuralo para registrar o corregir.
+          {readOnlyReason ?? "Historial de solo lectura."}
         </p>
       ) : (
         <section className="bv-panel">
@@ -69,27 +75,54 @@ export function MeasurementsWorkspace({ profileId, catalog, readOnly }: Props) {
 
       <section className="bv-panel">
         <h2>Registros de {spec.label.toLowerCase()}</h2>
-        <label className="bv-muted" style={{ display: "inline-flex", gap: "0.4rem", marginBottom: "0.75rem" }}>
-          <input type="checkbox" checked={showReplaced}
-            onChange={(e) => setShowReplaced(e.target.checked)} />
+        <label
+          className="bv-muted"
+          style={{ display: "inline-flex", gap: "0.4rem", marginBottom: "0.75rem" }}
+        >
+          <input
+            type="checkbox"
+            checked={showReplaced}
+            onChange={(e) => setShowReplaced(e.target.checked)}
+          />
           Mostrar también versiones reemplazadas
         </label>
         {list.isLoading ? <p className="bv-muted">Cargando…</p> : null}
         {list.error ? <p className="bv-alert bv-alert--error">{list.error.message}</p> : null}
         {list.data ? (
-          <MeasurementTable rows={list.data.items} catalog={catalog} readOnly={readOnly}
-            onCorrect={(m) => { setHistoryOf(null); setCorrecting(m); }}
-            onHistory={(m) => { setCorrecting(null); setHistoryOf(m); }} />
+          <MeasurementTable
+            rows={list.data.items}
+            catalog={catalog}
+            readOnly={readOnly}
+            onCorrect={(m) => {
+              setHistoryOf(null);
+              setCorrecting(m);
+            }}
+            onHistory={(m) => {
+              setCorrecting(null);
+              setHistoryOf(m);
+            }}
+          />
         ) : null}
       </section>
 
       {correcting ? (
-        <CorrectionForm key={correcting.id} profileId={profileId} original={correcting}
-          spec={spec} catalog={catalog} onClose={() => setCorrecting(null)} />
+        <CorrectionForm
+          key={correcting.id}
+          profileId={profileId}
+          original={correcting}
+          spec={spec}
+          catalog={catalog}
+          onClose={() => setCorrecting(null)}
+        />
       ) : null}
       {historyOf ? (
-        <HistoryPanel key={historyOf.id} profileId={profileId} measurement={historyOf}
-          catalog={catalog} onClose={() => setHistoryOf(null)} />
+        <HistoryPanel
+          key={historyOf.id}
+          profileId={profileId}
+          measurement={historyOf}
+          catalog={catalog}
+          onClose={() => setHistoryOf(null)}
+        />
       ) : null}
     </>
   );
