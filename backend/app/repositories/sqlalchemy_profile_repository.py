@@ -32,7 +32,7 @@ class SqlAlchemyProfileRepository(ProfileRepository):
             raise ConflictError("Ya existe un expediente con ese código.") from exc
         return profile
 
-def list_accessible(
+    def list_accessible(
         self, *, user_id: UUID, status: ProfileStatus | None, limit: int, offset: int
     ) -> tuple[list[tuple[Profile, str]], int]:
         conditions = [ProfileAccess.user_id == user_id, ProfileAccess.revoked_at.is_(None)]
