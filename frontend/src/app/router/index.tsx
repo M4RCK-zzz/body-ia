@@ -5,6 +5,8 @@ import { RequireAuth } from "@/features/auth/RequireAuth";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ProfileDetailPage } from "@/features/profiles/ProfileDetailPage";
 import { ProfilesPage } from "@/features/profiles/ProfilesPage";
+import { CaptureHomePage } from "@/features/capture/CaptureHomePage";
+import { CapturePage } from "@/features/capture/CapturePage";
 import { AppShell } from "../layouts/AppShell";
 import { NotFoundPage } from "./NotFoundPage";
 
@@ -22,6 +24,8 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardPage /> },
       { path: "expedientes", element: <ProfilesPage /> },
       { path: "expedientes/:profileId", element: <ProfileDetailPage /> },
+      { path: "capture", element: <CaptureHomePage /> },
+      { path: "capture/:profileId", element: <CapturePage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

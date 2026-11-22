@@ -1,7 +1,9 @@
 import re
 from datetime import datetime
 from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, field_validator
+
 from app.domain.profiles import ProfileStatus
 
 _DISPLAY_CODE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{2,39}$")

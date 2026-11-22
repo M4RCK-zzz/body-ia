@@ -9,7 +9,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/' },
   { label: 'Expedientes', to: '/expedientes' },
-  { label: 'Captura corporal', phase: 4 },
+  { label: 'Captura corporal', to: '/capture' },
   { label: 'Análisis de pose', phase: 5 },
   { label: 'Visor 3D', phase: 6 },
   { label: 'Simulador', phase: 8 },

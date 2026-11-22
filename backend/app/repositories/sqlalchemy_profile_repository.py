@@ -1,12 +1,15 @@
 from uuid import UUID
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
 from app.core.errors import ConflictError
 from app.domain.profiles import ProfileStatus
+from app.models.access import ProfileAccess
 from app.models.profile import Profile
 from app.repositories.profile_repository import ProfileRepository
-from app.models.access import ProfileAccess
+
 
 class SqlAlchemyProfileRepository(ProfileRepository):
     def __init__(self, session: Session) -> None:

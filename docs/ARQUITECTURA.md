@@ -85,3 +85,35 @@ Tras la Fase 3A existe identidad (usuarios, roles, auditoría), pero los expedie
 * Los servicios reciben siempre `actor` como primer parámetro y delegan la autorización en `AccessGuard`.
 * `ProfileRepository.list_page` se sustituye por `list_accessible`, que solo devuelve expedientes con concesión activa.
 * Las fases de captura y análisis (4 y 5) reutilizarán `AccessGuard` y `ConsentService.ensure_valid`.
+## ADR-005 · Captura segura y storage privado (Fase 4)
+
+**Estado:** Aceptada (Fase 4)
+
+### Contexto
+
+Tras la Fase 3B, los expedientes tienen identidad, accesos y consentimiento, pero aún no existe un canal para capturar imágenes de referencia de forma segura. El Documento Maestro exige, antes de datos reales: validación de MIME real y contenido, límite de tamaño, re-encoding, borrado de EXIF, hash/checksum, almacenamiento privado privado con claves no predecibles, retención y borrado auditado.
+
+### Decisiones
+
+1. **Medios fotográficos no son mediciones.** `media_assets` nunca entra en las series de mediciones ni se presenta como `observed`; la UI los etiqueta como "material de referencia fotográfico".
+2. **Storage privado local.** Los bytes viven en `backend/storage/{shard2}/{key}`, con escritura atómica (`tmp` + `rename`), permisos `0600` y clave aleatoria `{uuid4}.{ext}` (jamás el nombre original). El navegador nunca toca el almacenamiento. La interfaz `StorageBackend` lo abstrae; el object storage (Fase 9) se añade como otra implementación sin cambiar rutas ni servicios.
+3. **Descarga autenticada por streaming.** `GET /api/media/{id}/content` sirve los bytes desde la API con `Cache-Control: private, no-store` y `X-Content-Type-Options: nosniff`. No hay URLs firmadas en local; las URLs firmadas llegarán con el proveedor de almacenamiento real.
+4. **Validación y sanitización.** Solo JPEG/PNG/WebP. `image` no es el contenido real: se verifica con Pillow (`.load()` + `format` en {JPEG, PNG, WEBP}). Los límites son `MAX_UPLOAD_MB` (grueso, 413) y `MEDIA_MAX_PIXELS` (25 Mpx) + 8000 px por lado. Se re-encodea con `ImageOps.exif_transpose(img)` (orientación) → flatten a blanco → `convert("RGB")` → JPEG `progressive/optimize`, PNG `optimize`, WebP `q85`. **Ningún EXIF, XMP o texto se copia**: la imagen se re-codifica desde una copia fresca.
+5. **Rechazo.** Si la imagen no valida, se persiste el registro de auditoría con metadatos (`status=rejected`, razón, tamaño crudo, checksum del archivo crudo, sin bytes en disco) y la API responde 422 `media_rejected`. Tampoco se guarda el archivo físico.
+6. **Ciclo de vida.** `uploaded → validating → ready / rejected / deleted`. No es una tabla append-only (las transiciones legítimas lo requieren); la trazabilidad contra borrados/cambios indebidos vive en auditoría (`media.uploaded`, `media.rejected`, `media.deleted`). El borrado es soft delete (`status=deleted` + `deleted_at` + `deleted_by_user_id`) y **borrado físico best-effort** del archivo en disco.
+7. **Retención.** `retention_until = uploaded_at + MEDIA_RETENTION_DAYS` (default 365, 1–3650). Fase 4 no purga: el borrado físico lo hace el propietario/editor (o Fase 9, cuando exista el job).
+8. **Autoría.** `uploaded_by_snapshot`/`uploaded_by_user_id` se fijan en el servidor; ningún cliente envía autoría.
+9. **Herencia de permisos.** Upload (POST) y delete (DELETE) requieren `editor`+, expediente activo y consentimiento vigente, igual que mediciones. Lecturas (lista/metadata/content) requieren `viewer`+ vía `AccessGuard`. El `admin` no obtiene acceso implícito.
+
+### Compromisos conocidos aceptados
+
+- El rechazo persiste metadatos sin bytes; una imagen cifrada/maliciosa que supera el límite de tamaño se rechaza con 413 antes de cualquier escritura a disco.
+- Los estados `uploaded`/`validating` son transitorios dentro de la misma request; el cliente solo observa `ready`/`rejected` (o el error). En Fase 5 entrarán el análisis asíncrono.
+- El content endpoint no se audita en cada carga (se evita spam por thumbnails); en Fase 9 llegará la observabilidad de accesos.
+- `media_assets` no tiene trigger append-only: la mitigación es auditoría + eventos de borrado.
+
+### Consecuencias
+
+- `MediaService` delega en `AccessGuard` y `ConsentService` como todas las escrituras.
+- `StorageBackend` es la única vía de acceso a bytes; S3/TLS se añadirán en Fase 9 sin cambiar rutas/servicios.
+- El frontend pinta los assets con una etiqueta "material de referencia" y nunca los mezclará con series de mediciones, estimaciones o simulaciones.

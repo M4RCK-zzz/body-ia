@@ -1,7 +1,9 @@
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from decimal import Decimal
+
 from app.domain.measurements import MeasurementMethod, MeasurementType, MeasurementUnit
+
 
 @dataclass(frozen=True, slots=True)
 class MetricSpec:

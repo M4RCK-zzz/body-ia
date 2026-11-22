@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     upload_dir: Path = BACKEND_DIR / "storage"
     max_upload_mb: int = Field(default=10, ge=1, le=50)
+    media_retention_days: int = Field(default=365, ge=1, le=3650)
+    media_max_pixels: int = Field(default=25_000_000, ge=1_000_000, le=100_000_000)
     pose_model_path: Path = BACKEND_DIR / "models_ai" / "pose_landmarker_full.task"
 
     # --- Identidad (Fase 3) ---

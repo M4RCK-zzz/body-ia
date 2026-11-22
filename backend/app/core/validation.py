@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+
 def _field_name(loc: tuple[int | str, ...]) -> str:
     parts = loc[1:] if len(loc) > 1 else loc
     return ".".join(str(p) for p in parts)

@@ -2,9 +2,16 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
+
 from pydantic import (
-    AwareDatetime, BaseModel, ConfigDict, Field, PlainSerializer, field_validator,
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    field_validator,
 )
+
 from app.domain.enums import DataKind
 from app.domain.measurements import MeasurementMethod, MeasurementType, MeasurementUnit
 

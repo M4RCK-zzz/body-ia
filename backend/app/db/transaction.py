@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+
 class SessionTransaction:
     def __init__(self, session: Session) -> None:
         self._session = session

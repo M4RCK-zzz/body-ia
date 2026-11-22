@@ -9,24 +9,34 @@ from app.core.clock import utcnow
 from app.core.errors import ConflictError
 from app.domain.access import AccessLevel, ConsentPurpose
 from app.domain.measurements import MeasurementType
+from app.domain.media import MediaStatus
 from app.domain.metrics import default_catalog
 from app.domain.profiles import ProfileStatus
 from app.models.access import Consent, ProfileAccess
 from app.models.identity import User
 from app.models.measurement import Measurement
+from app.models.media import MediaAsset
 from app.models.profile import Profile
 from app.repositories.access_repository import ConsentRepository, ProfileAccessRepository
 from app.repositories.measurement_repository import MeasurementRepository
+from app.repositories.media_repository import MediaRepository
 from app.repositories.profile_repository import ProfileRepository
 from app.services.access_guard import AccessGuard
 from app.services.audit_service import AuditRecorder
 from app.services.consent_service import ConsentService
 from app.services.measurement_service import MeasurementService
+from app.services.media_service import MediaService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
 from tests.identity_fakes import FakeTransaction, InMemoryAuditRepository, InMemoryUserRepository
 
-__all__ = ["FakeTransaction", "Services", "build_services"]
+__all__ = [
+    "FakeTransaction",
+    "FakeStorageBackend",
+    "InMemoryMediaRepository",
+    "Services",
+    "build_services",
+]
 
 
 def _val(x):
@@ -105,6 +115,68 @@ class InMemoryConsentRepository(ConsentRepository):
             ),
             None,
         )
+
+
+class FakeStorageBackend:
+    """Storage en memoria para tests: convenciones idénticas a LocalStorageBackend."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+        self.calls: list[tuple[str, str]] = []
+
+    def put(self, key: str, data: bytes) -> None:
+        self.calls.append(("put", key))
+        if key in self.files:
+            raise RuntimeError("la clave ya existe")
+        self.files[key] = bytes(data)
+
+    def get(self, key: str) -> bytes:
+        self.calls.append(("get", key))
+        data = self.files.get(key)
+        if data is None:
+            raise FileNotFoundError(key)
+        return data
+
+    def exists(self, key: str) -> bool:
+        self.calls.append(("exists", key))
+        return key in self.files
+
+    def delete(self, key: str) -> None:
+        self.calls.append(("delete", key))
+        self.files.pop(key, None)
+
+
+class InMemoryMediaRepository(MediaRepository):
+    def __init__(self) -> None:
+        self.items: list[MediaAsset] = []
+
+    def get(self, asset_id: UUID) -> MediaAsset | None:
+        return next((a for a in self.items if a.id == asset_id), None)
+
+    def add(self, asset: MediaAsset) -> MediaAsset:
+        asset.id = asset.id or uuid4()
+        asset.uploaded_at = asset.uploaded_at or utcnow()
+        self.items.append(asset)
+        return asset
+
+    def save(self, asset: MediaAsset) -> MediaAsset:
+        return asset
+
+    def list_page(
+        self,
+        *,
+        profile_id: UUID,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MediaAsset], int]:
+        rows = [a for a in self.items if a.profile_id == profile_id]
+        if status is not None:
+            rows = [a for a in rows if a.status == status]
+        else:
+            rows = [a for a in rows if a.status != MediaStatus.DELETED.value]
+        rows.sort(key=lambda a: (a.uploaded_at, a.id), reverse=True)
+        return rows[offset : offset + limit], len(rows)
 
 
 class InMemoryProfileRepository(ProfileRepository):
@@ -218,6 +290,8 @@ class Services:
     consents_repo: InMemoryConsentRepository
     profiles_repo: InMemoryProfileRepository
     measurements_repo: InMemoryMeasurementRepository
+    media_repo: InMemoryMediaRepository
+    storage: FakeStorageBackend
     tx: FakeTransaction
     clock: object
     guard: AccessGuard
@@ -225,6 +299,7 @@ class Services:
     access_service: ProfileAccessService
     profiles: ProfileService
     measurements: MeasurementService
+    media: MediaService
 
     # --- ayudas para los tests ---
     def new_user(self, name: str, role: str = "user") -> User:
@@ -264,6 +339,8 @@ def build_services(clock=utcnow) -> Services:
     consents_repo = InMemoryConsentRepository()
     profiles_repo = InMemoryProfileRepository(access_repo)
     measurements_repo = InMemoryMeasurementRepository()
+    media_repo = InMemoryMediaRepository()
+    storage = FakeStorageBackend()
     guard = AccessGuard(profiles_repo, access_repo, audit, tx)
     consent = ConsentService(guard, consents_repo, audit, tx, clock=clock)
     return Services(
@@ -273,6 +350,8 @@ def build_services(clock=utcnow) -> Services:
         consents_repo=consents_repo,
         profiles_repo=profiles_repo,
         measurements_repo=measurements_repo,
+        media_repo=media_repo,
+        storage=storage,
         tx=tx,
         clock=clock,
         guard=guard,
@@ -281,5 +360,17 @@ def build_services(clock=utcnow) -> Services:
         profiles=ProfileService(profiles_repo, access_repo, guard, audit, tx, clock=clock),
         measurements=MeasurementService(
             guard, measurements_repo, default_catalog(), consent, audit, tx, clock=clock
+        ),
+        media=MediaService(
+            guard,
+            media_repo,
+            storage,
+            consent,
+            audit,
+            tx,
+            clock=clock,
+            max_upload_bytes=10 * 1024 * 1024,
+            max_pixels=25_000_000,
+            retention_days=365,
         ),
     )

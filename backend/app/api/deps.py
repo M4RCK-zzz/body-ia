@@ -11,6 +11,7 @@ from app.core.tokens import JwtTokenService
 from app.db.session import get_db
 from app.db.transaction import SessionTransaction
 from app.domain.metrics import MetricCatalog, default_catalog
+from app.integrations.storage import LocalStorageBackend, StorageBackend
 from app.repositories.health import HealthRepository, SQLAlchemyHealthRepository
 from app.repositories.sqlalchemy_access_repository import (
     SqlAlchemyConsentRepository,
@@ -18,6 +19,7 @@ from app.repositories.sqlalchemy_access_repository import (
 )
 from app.repositories.sqlalchemy_audit_repository import SqlAlchemyAuditRepository
 from app.repositories.sqlalchemy_measurement_repository import SqlAlchemyMeasurementRepository
+from app.repositories.sqlalchemy_media_repository import SqlAlchemyMediaRepository
 from app.repositories.sqlalchemy_profile_repository import SqlAlchemyProfileRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.services.access_guard import AccessGuard
@@ -26,6 +28,7 @@ from app.services.auth_service import AuthPolicy, AuthService
 from app.services.consent_service import ConsentService
 from app.services.health_service import HealthService
 from app.services.measurement_service import MeasurementService
+from app.services.media_service import MediaService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
 from app.services.user_admin_service import UserAdminService
@@ -142,4 +145,25 @@ def get_user_admin_service(db: Annotated[Session, Depends(get_db)]) -> UserAdmin
         audit_repository=audit_repository,
         audit=AuditRecorder(audit_repository),
         tx=SessionTransaction(db),
+    )
+
+def get_storage() -> StorageBackend:
+    return LocalStorageBackend(get_settings().upload_dir)
+
+
+def get_media_service(
+    db: Session = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+) -> MediaService:
+    settings = get_settings()
+    return MediaService(
+        guard=get_access_guard(db),
+        media=SqlAlchemyMediaRepository(db),
+        storage=storage,
+        consents=get_consent_service(db),
+        audit=_audit(db),
+        tx=SessionTransaction(db),
+        max_upload_bytes=settings.max_upload_mb * 1024 * 1024,
+        max_pixels=settings.media_max_pixels,
+        retention_days=settings.media_retention_days,
     )

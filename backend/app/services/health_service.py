@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
+
 from app.core.config import Settings
 from app.repositories.health import HealthRepository
 from app.schemas.health import HealthResponse
+
 
 class HealthService:
     def __init__(self, repository: HealthRepository, settings: Settings) -> None:

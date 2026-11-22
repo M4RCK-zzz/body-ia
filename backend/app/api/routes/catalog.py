@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+
 from app.api.deps import get_metric_catalog
 from app.domain.metrics import METHOD_LABELS, MetricCatalog
 from app.schemas.measurement import MeasurementCatalogRead, MethodRead, MetricSpecRead

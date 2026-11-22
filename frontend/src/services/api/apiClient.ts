@@ -24,7 +24,10 @@ type QueryValue = string | number | boolean | null | undefined;
 interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   query?: Record<string, QueryValue>;
+  /** JSON por defecto; FormData para subidas multipart (el navegador fija el Content-Type). */
   body?: unknown;
+  /** Devuelve un Blob en lugar de JSON (descargas autenticadas). */
+  blob?: boolean;
   /** No adjunta el token ni dispara el cierre de sesión (login, registro, health). */
   skipAuth?: boolean;
   signal?: AbortSignal;
@@ -62,6 +65,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     method = "GET",
     query,
     body,
+    blob = false,
     skipAuth = false,
     signal,
     timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -74,8 +78,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const headers: Record<string, string> = {
+    Accept: blob ? "image/*, application/octet-stream" : "application/json",
+  };
+  if (body !== undefined && !isFormData) headers["Content-Type"] = "application/json";
 
   const token = skipAuth ? null : getAccessToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -98,7 +105,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     response = await fetch(url, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
       signal: controller.signal,
     });
   } catch (error) {
@@ -118,5 +125,6 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (!response.ok) throw await toHttpError(response);
   if (response.status === 204) return undefined as T;
+  if (blob) return (await response.blob()) as T;
   return (await response.json()) as T;
 }

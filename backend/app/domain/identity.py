@@ -36,6 +36,9 @@ class AuditAction(StrEnum):
     ACCESS_DENIED = "access.denied"
     CONSENT_ACCEPTED = "consent.accepted"
     CONSENT_REVOKED = "consent.revoked"
+    MEDIA_UPLOADED = "media.uploaded"
+    MEDIA_REJECTED = "media.rejected"
+    MEDIA_DELETED = "media.deleted"
 
 
 MIN_PASSWORD_LENGTH = 10

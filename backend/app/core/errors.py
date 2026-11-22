@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+
 class AppError(Exception):
     status_code: int = 400
     code: str = "app_error"
@@ -22,6 +23,24 @@ class ConflictError(AppError):
 class BusinessRuleError(AppError):
     status_code = 422
     code = "business_rule_violation"
+
+class MediaRejectedError(AppError):
+    """Contenido de la imagen rechazado (422). No se persiste el archivo."""
+
+    status_code = 422
+    code = "media_rejected"
+
+class FileTooLargeError(AppError):
+    """El archivo crudo supera MAX_UPLOAD_MB antes de cualquier escritura (413)."""
+
+    status_code = 413
+    code = "file_too_large"
+
+class UnsupportedMediaTypeError(AppError):
+    """Tipo MIME no soportado (415)."""
+
+    status_code = 415
+    code = "unsupported_media_type"
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)

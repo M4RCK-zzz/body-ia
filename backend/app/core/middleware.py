@@ -1,6 +1,8 @@
 from collections.abc import Awaitable, Callable
 from uuid import uuid4
+
 from fastapi import FastAPI, Request, Response
+
 
 def register_request_id_middleware(app: FastAPI) -> None:
     @app.middleware("http")

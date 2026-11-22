@@ -1,8 +1,11 @@
 from collections.abc import Sequence
 from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from app.repositories.base import ModelT, Repository
+
 
 class SQLAlchemyRepository(Repository[ModelT]):
     model: type[ModelT]

@@ -1,10 +1,13 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.clock import utcnow
 from app.db.base import Base
+
 
 class Measurement(Base):
     __tablename__ = "measurements"

@@ -1,10 +1,13 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import CheckConstraint, DateTime, String, func,ForeignKey
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.clock import utcnow
 from app.db.base import Base
 from app.domain.profiles import ProfileStatus
+
 
 class Profile(Base):
     __tablename__ = "profiles"

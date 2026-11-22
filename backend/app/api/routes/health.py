@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+
 from app.api.deps import get_health_service
 from app.schemas.health import HealthResponse
 from app.services.health_service import HealthService
