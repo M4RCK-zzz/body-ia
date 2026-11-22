@@ -117,3 +117,38 @@ Tras la Fase 3B, los expedientes tienen identidad, accesos y consentimiento, per
 - `MediaService` delega en `AccessGuard` y `ConsentService` como todas las escrituras.
 - `StorageBackend` es la única vía de acceso a bytes; S3/TLS se añadirán en Fase 9 sin cambiar rutas/servicios.
 - El frontend pinta los assets con una etiqueta "material de referencia" y nunca los mezclará con series de mediciones, estimaciones o simulaciones.
+## ADR-006 · Análisis de pose (Fase 5)
+
+**Estado:** Aceptada (Fase 5)
+
+### Contexto
+
+Tras la Fase 4 existen assets `ready` validados y almacenados privadamente. El Documento Maestro (RF-010/011) exige análisis de pose reproducible: MediaPipe Pose Landmarker, estados versionados, banderas de calidad y revisión humanas visibles — separados siempre de las mediciones observadas.
+
+### Decisiones
+
+1. **No es medición.** Un resultado de pose es una *estimación visual* (`visual_estimate`). La UI lo etiqueta "ESTIMACIÓN VISUAL" con versión del modelo; nunca se mezcla ni re-calcula como medición observada.
+2. **Cola en PostgreSQL, sin Redis/Celery.** El worker afirma la tarea con `SELECT ... FOR UPDATE SKIP LOCKED` (`status='queued'`), marca `processing` y hace commit inmediato del claim. Así es seguro múltiples workers concurrentes y el reinicio del proceso no pierde tareas. Sin job externo, sin agente externo: `python -m app.workers.pose_worker`.
+3. **Worker independiente, lazy-import.** `mediapipe` no se importa en la API; el worker lo carga una vez en arranque. Si falta el binario o el modelo, el worker falla claro al arrancar y cada tarea termina `failed` con `error_message` explicito (no se cae).
+4. **Idempotencia por asset.** Una asset activo solo puede tener una tarea en `queued`/`processing` al mismo tiempo. Re-POST devuelve `200` con la misma tarea (`201`/`202` solo en la creación). Nunca duplicar análisis por error de reintento.
+5. **Estados.** `queued → processing → completed | needs_review | failed`. `completed` ≥ 25/33 landmarks visibles (visibility ≥ 0.5); `needs_review` ≥ 10 pero < 25 (pose parcial o baja calidad); `failed` < 10 visibles o error del modelo/archivo. `failed` también representa fallo de infra (modelo no encontrado, archivo no disponible, excepción).
+6. **Versionado y reproductibilidad.** Cada análisis guarda `model_name`, `model_version` (sha256[:16] del archivo `.task`), y `model_config` (mediapipe version, sha256 completo, umbrales usados, archivo del .task, thresholds configurados). El input reproducible es el checksum del asset (`media_assets.checksum`).
+7. **Solo `ready` entra.** Un asset `uploaded`/`validating`/`rejected`/`deleted` devuelve `422` con mensaje claro.
+8. **Autorización.** POST/list/detail: permiso `editor`+ y expediente `active` y consentimiento `data_processing` vigente (mismo patrón Fase 4). Lectura: `viewer`+. El `admin` no obtiene acceso implícito. Autoría fija en el servidor.
+9. **Auditoría.** `pose.queued` al crear (actor = quien inicia) y `pose.completed`/`pose.needs_review`/`pose.failed` al terminar (actor = quien inició, registrado en la tarea).
+10. **Stale processing.** Si el worker cae o se mata, las tareas `processing` con `started_at` más antiguo que `POSE_STALE_PROCESSING_SECONDS` (default 1800 s) se marcan `failed` con `error_message='processing_stale'` en el arranque del worker.
+11. **Retención.** No hay purga en Fase 5; los registros de pose se tratan con el medio (`media_assets`). La purga automatizada llega en Fase 9.
+
+### Compromisos conocidos aceptados
+
+- Los `landmarks_json` crecen con el número de landmarks × precisión; el default de 33 landmarks × {x,y,z,visibility} es ~50 KB por análisis. Aceptable sin compresión.
+- Landmarks normalizados (0–1) del MediaPipe Pose Landmarker: son referencias visuales orientativas, no coordenadas absolutas del cuerpo.
+- Sin reintentos automáticos en Fase 5: un análisis `failed` requiere un nuevo POST explícito.
+- El panel de revisión es parte del listado de captura; la página `/analyses/:id` deep-linka desde cada card/análisis.
+
+### Consecuencias
+
+- `PoseService` crea la tarea (POST) y la lee (GET); no ejecuta el modelo.
+- El worker `app/workers/pose_worker.py` ejecuta el modelo, evalua calidad y persiste el resultado.
+- `Config` gana: `POSE_MODEL_PATH`, `POSE_POLL_SECONDS`, `POSE_STALE_PROCESSING_SECONDS`, `POSE_COMPLETE_THRESHOLD`, `POSE_REVIEW_THRESHOLD`.
+- Fase 6 (Visor 3D) evaluará/adaptará el modelo 3D `SeemaBansal1/3d-human-body-anatomy` — **no se implementa aquí**.

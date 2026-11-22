@@ -11,21 +11,25 @@ from app.domain.access import AccessLevel, ConsentPurpose
 from app.domain.measurements import MeasurementType
 from app.domain.media import MediaStatus
 from app.domain.metrics import default_catalog
+from app.domain.pose import PoseAnalysisStatus
 from app.domain.profiles import ProfileStatus
 from app.models.access import Consent, ProfileAccess
 from app.models.identity import User
 from app.models.measurement import Measurement
 from app.models.media import MediaAsset
+from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
 from app.repositories.access_repository import ConsentRepository, ProfileAccessRepository
 from app.repositories.measurement_repository import MeasurementRepository
 from app.repositories.media_repository import MediaRepository
+from app.repositories.pose_repository import PoseRepository
 from app.repositories.profile_repository import ProfileRepository
 from app.services.access_guard import AccessGuard
 from app.services.audit_service import AuditRecorder
 from app.services.consent_service import ConsentService
 from app.services.measurement_service import MeasurementService
 from app.services.media_service import MediaService
+from app.services.pose_service import PoseService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
 from tests.identity_fakes import FakeTransaction, InMemoryAuditRepository, InMemoryUserRepository
@@ -34,6 +38,7 @@ __all__ = [
     "FakeTransaction",
     "FakeStorageBackend",
     "InMemoryMediaRepository",
+    "InMemoryPoseRepository",
     "Services",
     "build_services",
 ]
@@ -179,6 +184,88 @@ class InMemoryMediaRepository(MediaRepository):
         return rows[offset : offset + limit], len(rows)
 
 
+class InMemoryPoseRepository(PoseRepository):
+    def __init__(self) -> None:
+        self.items: list[PoseAnalysis] = []
+
+    def get(self, analysis_id: UUID) -> PoseAnalysis | None:
+        return next((a for a in self.items if a.id == analysis_id), None)
+
+    def add(self, analysis: PoseAnalysis) -> PoseAnalysis:
+        analysis.id = analysis.id or uuid4()
+        analysis.created_at = analysis.created_at or utcnow()
+        self.items.append(analysis)
+        return analysis
+
+    def save(self, analysis: PoseAnalysis) -> PoseAnalysis:
+        return analysis
+
+    def find_active_for_asset(self, asset_id: UUID) -> PoseAnalysis | None:
+        return next(
+            (
+                a
+                for a in self.items
+                if a.media_asset_id == asset_id
+                and a.status in (
+                    PoseAnalysisStatus.QUEUED.value,
+                    PoseAnalysisStatus.PROCESSING.value,
+                )
+            ),
+            None,
+        )
+
+    def list_page(
+        self,
+        *,
+        profile_id: UUID,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[PoseAnalysis], int]:
+        rows = [a for a in self.items if a.profile_id == profile_id]
+        if status is not None:
+            rows = [a for a in rows if a.status == status]
+        rows.sort(key=lambda a: (a.created_at, a.id), reverse=True)
+        return rows[offset : offset + limit], len(rows)
+
+    def list_page_by_asset(
+        self,
+        *,
+        media_asset_id: UUID,
+        status: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[PoseAnalysis], int]:
+        rows = [a for a in self.items if a.media_asset_id == media_asset_id]
+        if status is not None:
+            rows = [a for a in rows if a.status == status]
+        rows.sort(key=lambda a: (a.created_at, a.id), reverse=True)
+        return rows[offset : offset + limit], len(rows)
+
+    def claim_next(self) -> PoseAnalysis | None:
+        rows = [
+            a
+            for a in self.items
+            if a.status == PoseAnalysisStatus.QUEUED.value
+        ]
+        rows.sort(key=lambda a: (a.created_at, a.id))
+        return rows[0] if rows else None
+
+    def mark_stale_failed(self, stale_before, *, now, reason: str) -> int:
+        count = 0
+        for a in self.items:
+            if (
+                a.status == PoseAnalysisStatus.PROCESSING.value
+                and a.started_at is not None
+                and a.started_at <= stale_before
+            ):
+                a.status = PoseAnalysisStatus.FAILED.value
+                a.error_message = reason[:300]
+                a.completed_at = now
+                count += 1
+        return count
+
+
 class InMemoryProfileRepository(ProfileRepository):
     def __init__(self, access: InMemoryProfileAccessRepository) -> None:
         self.items: dict[UUID, Profile] = {}
@@ -291,6 +378,7 @@ class Services:
     profiles_repo: InMemoryProfileRepository
     measurements_repo: InMemoryMeasurementRepository
     media_repo: InMemoryMediaRepository
+    pose_repo: InMemoryPoseRepository
     storage: FakeStorageBackend
     tx: FakeTransaction
     clock: object
@@ -300,6 +388,7 @@ class Services:
     profiles: ProfileService
     measurements: MeasurementService
     media: MediaService
+    pose: PoseService
 
     # --- ayudas para los tests ---
     def new_user(self, name: str, role: str = "user") -> User:
@@ -340,6 +429,7 @@ def build_services(clock=utcnow) -> Services:
     profiles_repo = InMemoryProfileRepository(access_repo)
     measurements_repo = InMemoryMeasurementRepository()
     media_repo = InMemoryMediaRepository()
+    pose_repo = InMemoryPoseRepository()
     storage = FakeStorageBackend()
     guard = AccessGuard(profiles_repo, access_repo, audit, tx)
     consent = ConsentService(guard, consents_repo, audit, tx, clock=clock)
@@ -351,6 +441,7 @@ def build_services(clock=utcnow) -> Services:
         profiles_repo=profiles_repo,
         measurements_repo=measurements_repo,
         media_repo=media_repo,
+        pose_repo=pose_repo,
         storage=storage,
         tx=tx,
         clock=clock,
@@ -360,6 +451,15 @@ def build_services(clock=utcnow) -> Services:
         profiles=ProfileService(profiles_repo, access_repo, guard, audit, tx, clock=clock),
         measurements=MeasurementService(
             guard, measurements_repo, default_catalog(), consent, audit, tx, clock=clock
+        ),
+        pose=PoseService(
+            guard,
+            media_repo,
+            pose_repo,
+            consent,
+            audit,
+            tx,
+            clock=clock,
         ),
         media=MediaService(
             guard,

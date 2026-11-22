@@ -7,6 +7,8 @@ import { ProfileDetailPage } from "@/features/profiles/ProfileDetailPage";
 import { ProfilesPage } from "@/features/profiles/ProfilesPage";
 import { CaptureHomePage } from "@/features/capture/CaptureHomePage";
 import { CapturePage } from "@/features/capture/CapturePage";
+import { PoseListPage } from "@/features/pose/PoseListPage";
+import { PoseAnalysisDetailPage } from "@/features/pose/PoseAnalysisDetailPage";
 import { AppShell } from "../layouts/AppShell";
 import { NotFoundPage } from "./NotFoundPage";
 
@@ -26,6 +28,8 @@ export const router = createBrowserRouter([
       { path: "expedientes/:profileId", element: <ProfileDetailPage /> },
       { path: "capture", element: <CaptureHomePage /> },
       { path: "capture/:profileId", element: <CapturePage /> },
+      { path: "analyses", element: <PoseListPage /> },
+      { path: "analyses/:id", element: <PoseAnalysisDetailPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

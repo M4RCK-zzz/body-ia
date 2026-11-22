@@ -39,6 +39,10 @@ class AuditAction(StrEnum):
     MEDIA_UPLOADED = "media.uploaded"
     MEDIA_REJECTED = "media.rejected"
     MEDIA_DELETED = "media.deleted"
+    POSE_QUEUED = "pose.queued"
+    POSE_COMPLETED = "pose.completed"
+    POSE_NEEDS_REVIEW = "pose.needs_review"
+    POSE_FAILED = "pose.failed"
 
 
 MIN_PASSWORD_LENGTH = 10

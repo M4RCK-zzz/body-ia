@@ -8,6 +8,7 @@ import { CaptureList } from "./CaptureList";
 import { CaptureUpload } from "./CaptureUpload";
 import { useMediaAssets } from "./hooks/useMedia";
 import { PROFILE_STATUS_LABEL } from "@/types/profile";
+import { PoseReviewPanel } from "@/features/pose/PoseReviewPanel";
 import "./capture.css";
 
 export function CapturePage() {
@@ -66,6 +67,8 @@ export function CapturePage() {
       <CaptureGuide />
 
       <CaptureUpload profileId={p.id} readOnly={readOnlyReason !== undefined} readOnlyReason={readOnlyReason} />
+
+      <PoseReviewPanel profileId={p.id} />
 
       <section className="bv-panel">
         <h2>Capturas de {p.display_code}</h2>

@@ -9,6 +9,7 @@ from app.api.routes import (
     health,
     measurements,
     media,
+    pose,
     profiles,
 )
 
@@ -23,3 +24,6 @@ api_router.include_router(access.router)
 api_router.include_router(consents.router)
 api_router.include_router(media.router)
 api_router.include_router(media.asset_router)
+api_router.include_router(pose.router)
+api_router.include_router(pose.asset_router)
+api_router.include_router(pose.profile_router)

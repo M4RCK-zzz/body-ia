@@ -30,7 +30,12 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=10, ge=1, le=50)
     media_retention_days: int = Field(default=365, ge=1, le=3650)
     media_max_pixels: int = Field(default=25_000_000, ge=1_000_000, le=100_000_000)
-    pose_model_path: Path = BACKEND_DIR / "models_ai" / "pose_landmarker_full.task"
+    pose_model_path: Path = BACKEND_DIR / "models" / "pose_landmarker_full.task"
+    pose_poll_seconds: float = Field(default=5.0, ge=0.5, le=60.0)
+    pose_stale_processing_seconds: int = Field(default=1800, ge=60, le=86400)
+    pose_complete_threshold: int = Field(default=25, ge=5, le=33)
+    pose_review_threshold: int = Field(default=10, ge=1, le=32)
+    pose_visibility_threshold: float = Field(default=0.5, ge=0.1, le=1.0)
 
     # --- Identidad (Fase 3) ---
     jwt_secret: SecretStr

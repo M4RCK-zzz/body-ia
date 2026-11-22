@@ -10,7 +10,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/' },
   { label: 'Expedientes', to: '/expedientes' },
   { label: 'Captura corporal', to: '/capture' },
-  { label: 'Análisis de pose', phase: 5 },
+  { label: 'Análisis de pose', to: '/analyses' },
   { label: 'Visor 3D', phase: 6 },
   { label: 'Simulador', phase: 8 },
   { label: 'Reportes', phase: 7 },
@@ -29,7 +29,7 @@ export function SideNav() {
             {item.to ? (
               <NavLink
                 to={item.to}
-                end
+                end={item.to === '/'}
                 className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`}
               >
                 {item.label}

@@ -1,0 +1,33 @@
+/* Análisis de pose (Fase 5): panel de revisión + detalle. SIEMPRE ESTIMACIÓN VISUAL */
+
+.pose-panel__header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.pose-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700;
+  letter-spacing: 0.06em; border: 1px solid var(--warn); color: var(--warn);
+  background: rgba(251, 191, 36, 0.08); white-space: nowrap;
+}
+.pose-list { display: grid; gap: 0.5rem; }
+.pose-list__row {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.6rem 0.75rem; border: 1px solid #1f2f52; border-radius: 10px; background: #0b1426;
+}
+.pose-list__row a { color: var(--cyan); text-decoration: none; }
+.pose-list__row a:hover { text-decoration: underline; }
+.pose-list__meta { font-size: 0.78rem; color: #8fa3c4; margin: 0; }
+.pose-list__main { display: grid; gap: 0.15rem; min-width: 0; flex: 1; }
+.pose-list__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* Detalle */
+.pose-detail { display: grid; gap: 1.25rem; }
+.pose-detail__grid { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 800px) { .pose-detail__grid { grid-template-columns: 1fr; } }
+.pose-detail__body { display: grid; gap: 0.85rem; }
+.pose-detail__kv { display: grid; grid-template-columns: auto 1fr; gap: 0.4rem 1rem; font-size: 0.85rem; }
+.pose-detail__kv dt { color: #8fa3c4; margin: 0; }
+.pose-detail__kv dd { margin: 0; }
+.pose-skeleton { width: 100%; height: auto; border-radius: 12px; background: #060d1e; border: 1px solid #1f2f52; }
+.pose-skeleton__empty { color: #8fa3c4; font-size: 0.85rem; padding: 1rem; text-align: center; }
+.pose-landmarks { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.35rem; }
+.pose-landmark-chip { font-size: 0.72rem; color: #8fa3c4; background: #0b1426; border: 1px solid #1f2f52; border-radius: 8px; padding: 0.3rem 0.5rem; }
+.pose-flags { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.pose-flag { font-size: 0.78rem; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid #fbbf24; color: #fde68a; background: rgba(251,191,36,0.08); }

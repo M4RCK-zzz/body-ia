@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useDeleteMedia, useMediaContent } from "./hooks/useMedia";
 import { mediaApi } from "@/services/api/media";
 import { formatBytes, MEDIA_FORMAT_LABEL, MEDIA_STATUS_LABEL, truncateChecksum, type MediaAsset } from "@/types/media";
+import { POSE_STATUS_BADGE_CLASS, POSE_STATUS_LABEL, type PoseAnalysis } from "@/types/pose";
+import { useEnqueuePose, usePoseFromAsset } from "@/features/pose/hooks/usePose";
+import { Link } from "react-router-dom";
 
 interface Props {
   profileId: string;
@@ -43,6 +46,51 @@ function statusBadgeClass(status: MediaAsset["status"]): string {
     case "deleted": return "bv-alert--warn";
     default: return "bv-tag--status";
   }
+}
+
+function PoseCardSection({ asset, readOnly }: { asset: MediaAsset; readOnly: boolean }) {
+  const query = usePoseFromAsset(asset.id);
+  const enqueue = useEnqueuePose(asset.id, asset.profile_id);
+  const latest: PoseAnalysis | undefined = query.data?.items[0];
+  const active = latest?.status === "queued" || latest?.status === "processing";
+  const canEnqueue = asset.status === "ready" && !readOnly && !active;
+
+  async function onEnqueue() {
+    try {
+      await enqueue.mutateAsync();
+    } catch {
+      /* el botón queda habilitado; el error se muestra abajo */
+    }
+  }
+
+  const errorMsg = enqueue.error?.message;
+
+  return (
+    <div className="capture-list__pose">
+      {query.isLoading ? (
+        <span className="bv-muted">Cargando análisis…</span>
+      ) : latest ? (
+        <>
+          <span className={`bv-tag ${POSE_STATUS_BADGE_CLASS[latest.status]}`}>
+            {POSE_STATUS_LABEL[latest.status].toUpperCase()}
+          </span>
+          <Link className="bv-btn bv-btn--small" to={`/analyses/${latest.id}`}>
+            Ver análisis
+          </Link>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="bv-btn bv-btn--small"
+          disabled={!canEnqueue || enqueue.isPending}
+          onClick={onEnqueue}
+        >
+          {enqueue.isPending ? "Encolando…" : "Analizar pose"}
+        </button>
+      )}
+      {errorMsg ? <span className="bv-muted" style={{ color: "#fca5a5" }}>{errorMsg}</span> : null}
+    </div>
+  );
 }
 
 export function CaptureList({ profileId, assets, total, readOnly }: Props) {
@@ -136,6 +184,9 @@ export function CaptureList({ profileId, assets, total, readOnly }: Props) {
                 </button>
               ) : null}
             </div>
+            {asset.status !== "deleted" ? (
+              <PoseCardSection asset={asset} readOnly={readOnly} />
+            ) : null}
           </div>
         </article>
       ))}

@@ -19,6 +19,8 @@ dist/
 # Datos privados y modelos pesados
 backend/storage/*
 !backend/storage/.gitkeep
+backend/models/*
+!backend/models/.gitkeep
 backend/models_ai/*
 !backend/models_ai/.gitkeep
 *.task

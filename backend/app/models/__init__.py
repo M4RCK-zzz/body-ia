@@ -4,6 +4,7 @@ from app.models.audit_event import AuditEvent
 from app.models.identity import Role, User, user_roles
 from app.models.measurement import Measurement
 from app.models.media import MediaAsset
+from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
 
 __all__ = [
@@ -11,6 +12,7 @@ __all__ = [
     "Base",
     "Consent",
     "MediaAsset",
+    "PoseAnalysis",
     "Measurement",
     "Profile",
     "ProfileAccess",

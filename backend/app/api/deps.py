@@ -20,6 +20,7 @@ from app.repositories.sqlalchemy_access_repository import (
 from app.repositories.sqlalchemy_audit_repository import SqlAlchemyAuditRepository
 from app.repositories.sqlalchemy_measurement_repository import SqlAlchemyMeasurementRepository
 from app.repositories.sqlalchemy_media_repository import SqlAlchemyMediaRepository
+from app.repositories.sqlalchemy_pose_repository import SqlAlchemyPoseRepository
 from app.repositories.sqlalchemy_profile_repository import SqlAlchemyProfileRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.services.access_guard import AccessGuard
@@ -29,6 +30,7 @@ from app.services.consent_service import ConsentService
 from app.services.health_service import HealthService
 from app.services.measurement_service import MeasurementService
 from app.services.media_service import MediaService
+from app.services.pose_service import PoseService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
 from app.services.user_admin_service import UserAdminService
@@ -166,4 +168,15 @@ def get_media_service(
         max_upload_bytes=settings.max_upload_mb * 1024 * 1024,
         max_pixels=settings.media_max_pixels,
         retention_days=settings.media_retention_days,
+    )
+
+
+def get_pose_service(db: Session = Depends(get_db)) -> PoseService:
+    return PoseService(
+        guard=get_access_guard(db),
+        media=SqlAlchemyMediaRepository(db),
+        pose=SqlAlchemyPoseRepository(db),
+        consents=get_consent_service(db),
+        audit=_audit(db),
+        tx=SessionTransaction(db),
     )

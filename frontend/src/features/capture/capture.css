@@ -34,3 +34,5 @@
 .capture-home__card { display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem; background: #0f1b33; border: 1px solid #1f2f52; border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.15s ease; }
 .capture-home__card:hover { border-color: #22d3ee; }
 .capture-home__row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+
+.capture-list__pose { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.35rem; }

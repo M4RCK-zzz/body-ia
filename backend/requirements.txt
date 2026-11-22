@@ -10,3 +10,9 @@ PyJWT==2.10.1
 email-validator==2.2.0
 Pillow==13.0.0
 python-multipart==0.0.34
+
+# --- Worker de análisis de pose (Fase 5) ---
+# mediapipe==1.2.3: última revisión estable con ruedas Win-amd64/arm64 py3
+# (Windows) y py3-none para Linux/macOS; requires_python=None en PyPI.
+# El binario se importa lazy en workers/pose_runner.py; la API y los tests no lo requieren.
+mediapipe==1.2.3
