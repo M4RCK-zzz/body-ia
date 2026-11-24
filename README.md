@@ -30,12 +30,12 @@ Subida y borrado requieren: acceso **owner/editor** + consentimiento `data_proce
 ### Verificación
 ```powershell
 # Backend (desde backend/)
-python -m pytest                 # 187 tests (Fase 5 incluida)
-ruff check app/ tests/          # ruff (B008 conocido en rutas FastAPI)
+python -m pytest -q              # 443 tests (suites de fases 1-9 + admin)
+ruff check .                     # 0 avisos (gate de CI)
 # Frontend (desde frontend/)
 npm run build && npm run lint
 # Smoke (API local, arriba)
-powershell -ExecutionPolicy Bypass -File scripts/smoke_phase4.ps1
+powershell -ExecutionPolicy Bypass -File backend\scripts\smoke_phase4.ps1
 ```
 Nota: esta máquina (Linux sandbox) no tiene Postgres/Docker; la verificación E2E contra Postgres (`alembic upgrade head`, smoke real) se ejecuta en Windows con la BD arriba.
 
@@ -341,7 +341,7 @@ roles, no datos corporales, y la vista lo dice de forma permanente.
 |---|---|---|
 | **Usuarios** | Listado paginado con búsqueda por nombre/correo, filtro por rol y estado; activar/desactivar cuentas y editar roles | `GET /api/admin/users`, `PUT /api/admin/users/{id}/roles`, `POST /api/admin/users/{id}/activate|deactivate` |
 | **Auditoría** | Tabla paginada de `audit_events` con fecha, acción legible + código, actor, recurso, resumen del `detail` y `request_id`; filtros por acción, usuario y rango de fechas | `GET /api/admin/audit-events`, `GET /api/admin/audit-actions` |
-| **Workers** | Latidos de `pose`, `report`, `simulation` y `retention` con último latido, estado y último error; se refresca cada 30 s | `GET /api/health/workers` |
+| **Workers** | Latidos de `pose`, `report`, `simulation` (continuos, con umbral) y `retention` (bajo demanda) con último latido, estado y último error; se refresca cada 30 s | `GET /api/health/workers` (solo `admin`) |
 
 Reglas que la UI refleja y el backend impone: un administrador **no puede desactivar su propia
 cuenta** ni **quitarse el rol `admin`** a sí mismo (botón deshabilitado con el motivo + el error
@@ -410,10 +410,13 @@ antes de tener el certificado real. **No** se usa en producción.
 | `GET /api/health/live` | El proceso vive (no consulta la BD) |
 | `GET /api/health` | Compatibilidad: estado de la BD |
 | `GET /api/health/ready` | BD + **escritura real en storage** + migraciones al día (503 si falla) |
-| `GET /api/health/workers` | Latidos de los workers frente a `WORKER_STALE_SECONDS` |
+| `GET /api/health/workers` | Latidos frente a `WORKER_STALE_SECONDS` (**solo `admin`**, 401/403 al resto) |
 
 - **Rate limiting** por endpoint (login 5/min + 20/h por email, subidas 60/h, descargas
   120/h, techo 600/min) con `429` y `Retry-After`. `/api/health*` nunca se limita.
+- **La IP del límite no es falsificable**: con `TRUSTED_PROXIES=true` se usa `X-Real-IP`,
+  que Nginx **sobrescribe** con `$remote_addr`; `X-Forwarded-For` no se lee nunca (rotarlo
+  no evade el límite). Con `TRUSTED_PROXIES=false` (default) se usa la IP de la conexión.
 - **Cabeceras** en dos capas (FastAPI y Nginx), con CSP que permite **Draco WASM** del visor
   3D (`'wasm-unsafe-eval'`, `worker-src blob:`) sin abrir `unsafe-eval` de JavaScript.
 - **`X-Request-ID`** correlaciona cabecera, log JSON y `audit_events.detail`.
@@ -432,6 +435,13 @@ powershell -ExecutionPolicy Bypass -File backend\scripts\restore.ps1 -From D:\ba
 # Linux
 bash backend/scripts/backup.sh
 bash backend/scripts/restore.sh /backups/<ts> --target bodyvision_qa
+
+# Contenedores de operación (imagen `docker/ops.Dockerfile`: PostgreSQL 16 + cliente).
+# La imagen de la API NO trae `pg_dump`/`pg_restore`/`psql`, por eso estos servicios
+# usan una imagen propia. Los flags se añaden al comando, no lo sustituyen.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm backup
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm restore --target bodyvision_qa
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm retention --apply
 ```
 
 Cada backup produce `db.dump` (`pg_dump -Fc`), `storage.tar` (imágenes y binarios de reportes,
@@ -446,8 +456,9 @@ y auditoría de cada borrado. Nunca toca `measurements`, `pose_analyses` ni `aud
 
 ```powershell
 cd backend
-.venv\Scripts\python.exe -m pytest -q        # 416+ passed
+.venv\Scripts\python.exe -m pytest -q        # 443 passed
 .venv\Scripts\ruff.exe check .                 # 0 avisos
+.venv\Scripts\python.exe -m alembic check     # sin divergencias metadata/migraciones
 cd ..\frontend
 npm run lint
 npm run build
@@ -461,8 +472,9 @@ vuelta + `alembic check` + pytest + ruff), frontend (`npm ci` + lint + build con
 
 ### Documentación de cierre
 
-- `docs/QA_CHECKLIST.md` — 60 ítems con comando, evidencia y firma.
+- `docs/QA_CHECKLIST.md` — 75 ítems con comando, evidencia y firma.
 - `docs/SEGURIDAD_Y_PRIVACIDAD.md` — modelo de amenazas, mapa de datos y riesgos residuales.
 - `docs/runbooks/` — `deploy`, `rollback`, `backup-restore`, `incident-response`,
   `key-rotation`, `worker-down`, `disk-full`, `database-unavailable`.
-- `docs/ARQUITECTURA.md` — **ADR-010**.
+- `docs/ARQUITECTURA.md` — **ADR-002 a ADR-012** (ADR-001 no llegó a escribirse: la
+  numeración arranca en el 002).

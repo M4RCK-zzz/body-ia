@@ -199,7 +199,10 @@ services:
 
   # Purga de retención: una pasada por ejecución, no un servicio permanente.
   #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  #     run --rm retention --once [--apply]
+  #     run --rm retention                # dry run (RETENTION_DRY_RUN=true)
+  #   docker compose ... run --rm retention --apply
+  # `entrypoint` fija el módulo y `command` solo los argumentos: así los flags del
+  # runbook (`--apply`) se añaden al comando real en vez de sustituirlo.
   retention:
     image: bodyvision-api:${APP_VERSION:-0.1.0}
     profiles: ["ops"]
@@ -210,24 +213,56 @@ services:
       LOG_JSON: "true"
       UPLOAD_DIR: /app/storage
       RETENTION_DRY_RUN: ${RETENTION_DRY_RUN:-true}
-    command: ["python", "-m", "app.workers.retention_worker", "--once"]
+    entrypoint: ["python", "-m", "app.workers.retention_worker"]
+    command: ["--once"]
     volumes:
       - bodyvision_storage:/app/storage
     depends_on:
       backend:
         condition: service_started
 
-  # Backup manual/programado desde el host: `docker compose ... run --rm backup`
+  # Backup manual/programado desde el host: `docker compose ... run --rm backup`.
+  # Usa `docker/ops.Dockerfile` (PostgreSQL 16 + `pg_dump`/`pg_restore`/`psql`):
+  # la imagen de la API no trae cliente de PostgreSQL, así que el script fallaría.
   backup:
-    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    image: bodyvision-ops:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/ops.Dockerfile
     profiles: ["ops"]
     env_file: [.env.prod]
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      POSTGRES_DB: ${POSTGRES_DB:-bodyvision}
+      POSTGRES_USER: ${POSTGRES_USER:-bodyvision}
+      POSTGRES_HOST: db
+      PGPASSWORD: ${POSTGRES_PASSWORD}
       UPLOAD_DIR: /app/storage
       BACKUP_DIR: /backups
-      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
     entrypoint: ["bash", "/app/scripts/backup.sh"]
+    volumes:
+      - bodyvision_storage:/app/storage
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Restauración de ensayo o real (el script siempre crea una base nueva salvo
+  # `--force`): `docker compose ... run --rm restore <carpeta> [--target db]`.
+  restore:
+    image: bodyvision-ops:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/ops.Dockerfile
+    profiles: ["ops"]
+    env_file: [.env.prod]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bodyvision}
+      POSTGRES_USER: ${POSTGRES_USER:-bodyvision}
+      POSTGRES_HOST: db
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      UPLOAD_DIR: /app/storage
+    entrypoint: ["bash", "/app/scripts/restore.sh"]
     volumes:
       - bodyvision_storage:/app/storage
       - ./backups:/backups

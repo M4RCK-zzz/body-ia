@@ -4,10 +4,12 @@
 #
 #   ./restore.sh /backups/20260101T030000Z                       # ensayo
 #   ./restore.sh /backups/20260101T030000Z --force --target bodyvision  # real
+#
+# Sin argumentos de carpeta usa el backup más reciente en $BACKUP_DIR.
 set -euo pipefail
 
-FROM="${1:?Uso: restore.sh <carpeta-backup> [--force] [--target <db>] [--skip-storage]}"
-shift
+FROM="${1:-}"
+shift || true
 FORCE=0
 TARGET_DB=""
 SKIP_STORAGE=0
@@ -21,12 +23,17 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+BACKUP_DIR="${BACKUP_DIR:-/backups}"
 DB_NAME="${POSTGRES_DB:-bodyvision}"
 DB_USER="${POSTGRES_USER:-bodyvision}"
 DB_HOST="${POSTGRES_HOST:-db}"
 UPLOAD_DIR="${UPLOAD_DIR:-/app/storage}"
 
-[ -d "$FROM" ] || { echo "No existe $FROM" >&2; exit 1; }
+if [ -z "$FROM" ]; then
+  FROM="$(ls -1dt "$BACKUP_DIR"/*/ 2>/dev/null | head -n 1)"
+  FROM="${FROM%/}"
+fi
+[ -n "$FROM" ] && [ -d "$FROM" ] || { echo "No existe el backup: '$FROM'" >&2; exit 1; }
 [ -f "$FROM/manifest.json" ] || { echo "Falta manifest.json" >&2; exit 1; }
 
 TARGET_DB="${TARGET_DB:-${DB_NAME}_restore}"

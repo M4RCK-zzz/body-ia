@@ -38,7 +38,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 50 b
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm retention --once
 
 # 2. Revisar el log y, si es correcto, purgar de verdad
-docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm retention --once --apply
+#    (`--apply` se AÑADE al `--once` del servicio: el entrypoint fija el módulo)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm retention --apply
 ```
 
 ## Prevención
@@ -46,4 +47,4 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm retenti
 - Alertar al 80 % de uso del volumen.
 - `MEDIA_RETENTION_DAYS`, `REPORT_RETENTION_DAYS` y `SIMULATION_RETENTION_DAYS` ajustados a la
   política real.
-- Programar `retention --once --apply` (perfil `ops`) una vez al día.
+- Programar `run --rm retention --apply` (perfil `ops`) una vez al día.

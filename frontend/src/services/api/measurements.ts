@@ -13,6 +13,9 @@ export const measurementsApi = {
     }),
   series: (profileId: string, metric: MeasurementType) =>
     apiRequest<MeasurementSeries>(`${base(profileId)}/series`, { query: { metric_type: metric } }),
+  /** Detalle de una medición concreta (incluye las corregidas si se piden). */
+  get: (profileId: string, measurementId: string) =>
+    apiRequest<Measurement>(`${base(profileId)}/${measurementId}`),
   history: (profileId: string, measurementId: string) =>
     apiRequest<Measurement[]>(`${base(profileId)}/${measurementId}/history`),
   record: (profileId: string, payload: MeasurementCreatePayload) =>

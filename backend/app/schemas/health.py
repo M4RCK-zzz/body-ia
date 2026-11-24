@@ -32,6 +32,9 @@ class ReadinessResponse(BaseModel):
 class WorkerHealth(BaseModel):
     name: str
     version: str
+    # `continuous=False` marca un worker one-shot (retención): su último latido se
+    # informa, pero no participa del estado global ni del umbral de staleness.
+    continuous: bool = True
     alive: bool
     last_seen_at: datetime
     age_seconds: int

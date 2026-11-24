@@ -27,19 +27,25 @@ Nunca se mezclan en API ni UI; cada dato mostrado lleva su etiqueta (`DataKindBa
 
 ## Frontend
 `app` (rutas/layouts/providers) · `components` (UI base) · `features` (módulos por dominio) ·
-`services` (clientes API). Los módulos aún no implementados aparecen deshabilitados con su fase.
+`services` (clientes API). Todas las fases 1–9 están cerradas: el `SideNav` ya no muestra
+módulos deshabilitados y el único ítem condicionado por rol es **Administración**, que se
+oculta a quien no es `admin` (la ruta sigue protegida en el router y en el backend).
 
 ## Decisiones vigentes
 - Cola de workers (Fase 5) respaldada por PostgreSQL (`FOR UPDATE SKIP LOCKED`), sin Redis.
 - Almacenamiento de medios (Fase 4) tras una interfaz `StorageBackend`.
-- Python 3.11 fijo por compatibilidad futura con MediaPipe en Windows.
+- Python **3.13** (CI, Docker y `.venv` de referencia). MediaPipe 1.2.3 publica ruedas
+  para 3.13 y Windows, así que no hace falta anclarse a una versión anterior.
 ## ADR-003 · Identidad, RBAC y auditoría append-only (Fase 3A)
 - **Autenticación:** JWT de acceso de corta vida (30 min). El token solo identifica (`sub`); roles y estado de la cuenta se consultan en BD en cada petición.
 - **Contraseñas:** Argon2id. Política técnica mínima (10+ caracteres, letra y número).
 - **Fuerza bruta:** bloqueo temporal por cuenta tras N fallos; respuesta uniforme para no permitir enumeración de cuentas.
 - **RBAC:** `admin`, `professional`, `user`. `admin` gestiona cuentas, no obtiene acceso implícito a expedientes.
 - **Auditoría:** `audit_events` es append-only (trigger `BEFORE UPDATE OR DELETE`).
-- **Límites conocidos:** sin refresh token ni revocación en servidor; token en `sessionStorage`; sin rate limiting por IP.
+- **Límites conocidos (Fase 3A):** sin refresh token ni revocación en servidor; token en
+  `sessionStorage`. ~~Sin rate limiting por IP~~ → **superado en la Fase 9** con
+  `SlidingWindowLimiter` por IP/usuario/email (ver ADR-010, D5); la limitación que queda es
+  que el contador vive en memoria (N réplicas ⇒ N× el límite).
 ## ADR-004: Acceso por expediente, consentimiento y auditoría de denegaciones
 
 **Estado:** Aceptada (Fase 3B)
@@ -78,7 +84,9 @@ Tras la Fase 3A existe identidad (usuarios, roles, auditoría), pero los expedie
 * Las denegaciones solo se auditan si el expediente existe; el sondeo con UUID aleatorios no se registra.
 * El texto de consentimiento es un **borrador pendiente de revisión legal** (Ley 29733); no debe usarse con datos reales sin esa revisión.
 * No hay transferencia de propiedad.
-* No hay limitación de intentos por IP ni revocación de tokens en servidor.
+* ~~No hay limitación de intentos por IP~~ → **superado en la Fase 9** (rate limiting por
+  IP con `X-Real-IP` del proxy y bloqueo por cuenta). Sigue sin haber revocación individual
+  de tokens: la rotación de `JWT_SECRET` es la revocación global.
 
 ### Consecuencias
 
@@ -466,8 +474,10 @@ pueda desplegar, observar y recuperar.
 6. **Rate limiting propio, sin Redis (D5, D6).** `SlidingWindowLimiter` en memoria, claves
    hasheadas (nunca IP ni email en claro), reglas por endpoint (login 5/min y 20/h por email,
    subidas 60/h, descargas 120/h, techo de 600/min) y `limit_req` en Nginx como segunda
-   barrera. `/api/health*` y la documentación **nunca** se limitan. Limitación aceptada: con N
-   réplicas el límite efectivo es N×.
+   barrera. `/api/health*` y la documentación **nunca** se limitan. La IP se toma de
+   `X-Real-IP`, que Nginx **sobrescribe** con `$remote_addr`: `X-Forwarded-For` no se lee
+   nunca, así que rotarlo no evade el límite (con `TRUSTED_PROXIES=false` se usa la IP de la
+   conexión TCP). Limitación aceptada: con N réplicas el límite efectivo es N×.
 7. **Sesión en `sessionStorage` con CSP estricta (D7).** Se mantiene el contrato de bearer
    token (sin CSRF por diseño) y se compensa con CSP sin `unsafe-inline` ni `unsafe-eval` en
    script, `frame-ancestors 'none'` y vida de sesión atada a la pestaña. El riesgo residual
@@ -487,11 +497,17 @@ pueda desplegar, observar y recuperar.
     es la cabeza; devuelve 503 con el componente que falla.
 11. **Latido de workers en BD (D10).** Migración `0009_worker_heartbeats` con trigger que
     impide retroceder en el tiempo. Cada pasada deja constancia; `/health/workers` compara con
-    `WORKER_STALE_SECONDS`. Sin latidos, un worker muerto era invisible hasta que la cola
-    crecía. El latido **nunca** puede tumbar al worker: si falla, se registra y se continúa.
+    `WORKER_STALE_SECONDS` **solo para los workers continuos** (`pose`, `report`, `simulation`):
+    `retention` es one-shot (`--once` vía cron) y su último latido se informa con
+    `continuous=false` sin degradar el estado global. El endpoint requiere rol `admin`
+    (`require_admin`): expone versiones, iteraciones y `last_error` internos. Sin latidos, un
+    worker muerto era invisible hasta que la cola crecía. El latido **nunca** puede tumbar al
+    worker: si falla, se registra y se continúa.
 12. **Backup de dos piezas con manifiesto y restauración obligatoria (D11).** `pg_dump -Fc` +
     `tar` del storage privado (los binarios de reportes **no** están en PostgreSQL) +
-    `manifest.json` con SHA-256 y conteos por tabla. Scripts `backup.ps1`/`restore.ps1` y sus
+    `manifest.json` con SHA-256 y conteos por tabla. Los servicios `backup`/`restore` de
+    Compose usan `docker/ops.Dockerfile` (PostgreSQL 16 + `pg_dump`/`pg_restore`/`psql`),
+    porque la imagen de la API no trae cliente de PostgreSQL. Scripts `backup.ps1`/`restore.ps1` y sus
     equivalentes `.sh`. El restore verifica checksums, crea una base nueva, compara conteos y
     solo conmuta si cuadra. RPO 24 h / RTO 2 h; el ensayo de restauración forma parte del cierre.
 13. **Retención efectiva y conservadora (D14).** Hasta la Fase 8 `MEDIA_RETENTION_DAYS` solo se
@@ -534,9 +550,13 @@ pueda desplegar, observar y recuperar.
 - **Backend:** `app/core/rate_limit.py`, `rate_limit_middleware.py`, `security_headers.py`,
   `logging.py` (JSON + `ContextVar`), `app/workers/heartbeat.py`, `app/workers/retention_worker.py`,
   `app/models/worker_heartbeat.py`, `app/repositories/worker_heartbeat_repository.py`,
-  `app/scripts` de operación (`backup.ps1`/`.sh`, `restore.ps1`/`.sh`, `validate_compose.py`).
+  `backend/scripts` de operación (`backup.ps1`/`.sh`, `restore.ps1`/`.sh`, `validate_compose.py`).
+- **Nuevo:** `docker/ops.Dockerfile` (PostgreSQL 16 + `pg_dump`/`pg_restore`/`psql`) y los
+  servicios `backup`/`restore` de Compose, porque la imagen de la API no trae cliente de
+  PostgreSQL y los scripts de backup no podían ejecutarse en ella.
 - **Migración nueva:** `0009_worker_heartbeats` (tabla + índice + trigger monotónico).
-- **Endpoints nuevos:** `GET /api/health/live`, `/health/ready`, `/health/workers`.
+- **Endpoints nuevos:** `GET /api/health/live`, `/health/ready` y `/health/workers`
+  (este último **solo `admin`**: expone versiones de worker, iteraciones y `last_error`).
 - **Config nueva:** `DOMAIN`, `ENABLE_API_DOCS`, `SECURITY_HEADERS`, `HSTS_MAX_AGE`,
   `TRUSTED_PROXIES`, `RATE_LIMIT_*` (7), `LOG_JSON`, `WORKER_STALE_SECONDS`,
   `REPORT_RETENTION_DAYS`, `SIMULATION_RETENTION_DAYS`, `RETENTION_DRY_RUN`,
@@ -544,7 +564,7 @@ pueda desplegar, observar y recuperar.
 - **Acciones de auditoría nuevas:** `media.purged`, `report.purged`, `simulation.purged`, y
   `request_id` añadido al `detail` de todos los eventos.
 - **Frontend:** un solo lockfile (npm) y resolución correcta de `VITE_API_URL` vacío.
-- **Documentación de cierre:** `docs/QA_CHECKLIST.md` (60 ítems con evidencia),
+- **Documentación de cierre:** `docs/QA_CHECKLIST.md` (75 ítems con evidencia),
   `docs/SEGURIDAD_Y_PRIVACIDAD.md` (modelo de amenazas, mapa de datos, riesgos residuales),
   8 runbooks y este ADR. El proyecto queda cerrado en sus 9 fases.
 
@@ -592,6 +612,9 @@ gestión de cuentas y roles solo era posible con `curl` o con `create-admin.ps1`
 - Backend: filtros opcionales en `UserRepository`/`AuditRepository` y sus implementaciones,
   `distinct_actions()`, `get_many()`, `resolve_actors()` y `tests/test_admin_api.py` (15 tests).
 - `ROLE_DESCRIPTIONS` se centraliza en `features/auth/roles.ts`, espejo del backend.
+- Pestaña **Workers**: `retention` llega con `continuous: false` (bajo demanda) y no altera el
+  estado global, que solo evalúa `pose`, `report` y `simulation`; `/api/health/workers` exige
+  rol `admin` (`require_admin`, 401/403) porque expone `last_error` internos.
 
 ## ADR-012 · Capas ausentes en el visor y contexto en las listas
 

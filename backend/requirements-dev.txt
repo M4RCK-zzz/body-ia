@@ -1,4 +1,5 @@
--r requirements.txt
 pytest==8.3.4
 httpx==0.27.2
 ruff==0.8.4
+# `backend/scripts/validate_compose.py` (gate de CI) parsea los compose YAML.
+pyyaml==6.0.2

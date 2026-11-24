@@ -35,7 +35,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 curl -fsS https://$DOMAIN/api/health/live
 curl -fsS https://$DOMAIN/api/health/ready
-curl -fsS https://$DOMAIN/api/health/workers
+curl -fsS -H "Authorization: Bearer $ADMIN_TOKEN" https://$DOMAIN/api/health/workers
 curl -sI https://$DOMAIN/ | grep -Ei "content-security|strict-transport|x-frame"
 ```
 
@@ -45,6 +45,8 @@ curl -sI https://$DOMAIN/ | grep -Ei "content-security|strict-transport|x-frame"
 2. Un expediente existente abre y muestra sus mediciones (sin datos perdidos).
 3. Analítica responde y el PDF de un reporte se descarga.
 4. El visor 3D carga un modelo **sin errores de CSP en la consola**.
+   El panel **Administración → Workers** (solo `admin`) muestra los latidos; la API responde
+   `401`/`403` a `/api/health/workers` sin sesión de administrador.
 5. El simulador muestra el comparador con el aviso "ESCENARIO HIPOTÉTICO".
 
 ## Si algo falla

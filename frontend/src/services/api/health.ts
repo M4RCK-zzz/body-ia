@@ -7,8 +7,10 @@ export const getHealth = () =>
 /**
  * Latidos de los workers (`pose`, `report`, `simulation`, `retention`).
  *
- * Requiere sesión: el endpoint vive detrás del router autenticado y el panel de
- * administración es su único consumidor.
+ * Exige rol `admin`: el backend lo protege con `require_admin` porque devuelve
+ * versiones, iteraciones y `last_error` internos (401 sin sesión, 403 sin rol).
+ * El panel de administración es su único consumidor; `retention` llega con
+ * `continuous: false` y no altera el estado global.
  */
 export const getWorkersHealth = () =>
   apiRequest<WorkersHealth>("/api/health/workers", { timeoutMs: 8000 });

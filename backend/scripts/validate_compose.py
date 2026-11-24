@@ -65,7 +65,7 @@ def interpolate(value: Any, env: dict[str, str], errors: list[str], where: str) 
                 return env[name]
             if operator == ":-":
                 return argument
-            if operator == ":\?":
+            if operator == ":" + "?":
                 errors.append(f"{where}: variable obligatoria sin definir: {name} ({argument})")
                 return ""
             errors.append(f"{where}: variable sin definir y sin valor por defecto: {name}")
@@ -117,7 +117,7 @@ def check(composed: dict[str, Any]) -> list[str]:
         problems.append(f"faltan servicios de producción: {sorted(missing)}")
 
     # Servicios one-shot: terminan solos, no tienen política de reinicio.
-    one_shot = {"migrate", "retention", "backup"}
+    one_shot = {"migrate", "retention", "backup", "restore"}
 
     for name, svc in services.items():
         if "image" not in svc and "build" not in svc:
@@ -155,6 +155,32 @@ def check(composed: dict[str, Any]) -> list[str]:
     api_command = (services.get("backend", {}) or {}).get("command") or []
     if "alembic" in " ".join(str(part) for part in api_command):
         problems.append("la API ejecuta alembic en su CMD (prohibido: usar el job migrate)")
+
+    # Retención: `entrypoint` fija el módulo y `command` solo los argumentos, para
+    # que `run --rm retention --apply` (documentado) añada el flag en vez de
+    # sustituir el comando entero.
+    retention = services.get("retention", {}) or {}
+    retention_entry = " ".join(str(part) for part in retention.get("entrypoint") or [])
+    retention_cmd = " ".join(str(part) for part in retention.get("command") or [])
+    if "app.workers.retention_worker" not in retention_entry:
+        problems.append("retention: el entrypoint debe fijar app.workers.retention_worker")
+    if "--once" not in retention_cmd:
+        problems.append("retention: command debe ser '--once' (los flags van detrás)")
+    if "module" in retention_cmd or "python" in retention_cmd:
+        problems.append(
+            "retention: el módulo va en entrypoint; 'run --rm retention --apply' lo rompería"
+        )
+
+    # Backup/restore: necesitan el cliente de PostgreSQL (pg_dump/pg_restore/psql),
+    # que la imagen de la API no trae. Deben construirse desde docker/ops.Dockerfile.
+    for name in ("backup", "restore"):
+        svc = services.get(name, {}) or {}
+        dockerfile = (svc.get("build") or {}).get("dockerfile", "")
+        if "ops.Dockerfile" not in str(dockerfile):
+            problems.append(f"{name}: debe usar docker/ops.Dockerfile (cliente de PostgreSQL)")
+        env = svc.get("environment") or {}
+        if isinstance(env, dict) and not str(env.get("PGPASSWORD", "")).strip():
+            problems.append(f"{name}: sin PGPASSWORD (pg_dump/psql no podrían autenticarse)")
 
     # La API debe estar en producción y con docs cerradas.
     backend_env = (services.get("backend", {}) or {}).get("environment") or {}

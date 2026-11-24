@@ -1,5 +1,7 @@
 # Fase 8 — Simulación de escenarios hipotéticos (plan técnico)
 
+> **Documento histórico.** Plan de ejecución de la Fase 8, conservado como registro. Las
+> cifras y rutas definitivas están en `README.md` y `docs/ARQUITECTURA.md` (ADR-009).
 **Estado:** propuesta, pendiente de confirmación. **No se ha escrito código de Fase 8.**
 
 > Regla rectora: una simulación es un **escenario hipotético** (`DataKind=simulation`) que

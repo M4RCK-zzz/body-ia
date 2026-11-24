@@ -27,6 +27,10 @@ bash backend/scripts/backup.sh                     # con pg_dump en el host
 docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm backup
 ```
 
+**En contenedor (sin cliente de PostgreSQL en el host).** Los servicios `backup` y
+`restore` se construyen desde `docker/ops.Dockerfile` (`postgres:16.6-alpine` +
+`pg_dump`/`pg_restore`/`psql`), no desde la imagen de la API, que no trae el cliente.
+
 **Programación:** Programador de tareas (Windows) o `cron` (Linux) una vez al día, en hora
 valle. Ejemplo de cron:
 
@@ -42,6 +46,9 @@ powershell -ExecutionPolicy Bypass -File backend\scripts\restore.ps1 `
 ```
 ```bash
 bash backend/scripts/restore.sh /backups/20260101T030000Z --target bodyvision_qa
+# En contenedor: la carpeta es la del bind mount `./backups`; sin argumento usa la
+# más reciente de $BACKUP_DIR.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm restore --target bodyvision_qa
 ```
 
 Qué comprueba el script, en este orden:
@@ -55,7 +62,8 @@ Qué comprueba el script, en este orden:
 
 ## Restauración real
 
-1. Detener API y workers (`docker compose ... stop backend worker-* frontend`).
+1. Detener API y workers (`docker compose ... stop backend worker-pose worker-report
+   worker-simulation frontend`; Compose no expande comodines en nombres de servicio).
 2. Ejecutar el restore con `-Force` (o `--force`) sobre la base de la app.
 3. Sustituir el directorio de storage por el extraído, tras revisarlo.
 4. Levantar y verificar con `/api/health/ready` y el checklist funcional.

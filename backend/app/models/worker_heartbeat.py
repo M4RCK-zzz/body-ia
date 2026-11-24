@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Index, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -17,6 +17,9 @@ class WorkerHeartbeat(Base):
     """
 
     __tablename__ = "worker_heartbeats"
+    # El índice se crea en la migración `0009`; se declara aquí para que
+    # `alembic check` no vea una divergencia entre metadata y migraciones (CI).
+    __table_args__ = (Index("ix_worker_heartbeats_last_seen_at", "last_seen_at"),)
 
     name: Mapped[str] = mapped_column(String(40), primary_key=True)
     worker_version: Mapped[str] = mapped_column(String(20), nullable=False, default="0.1.0")

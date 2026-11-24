@@ -45,6 +45,22 @@ def env_file(tmp_path_factory) -> Path:
     return env
 
 
+def _composed() -> dict:
+    """Composición fusionada e interpolada, sin pasar por Docker."""
+    import os
+
+    sys.path.insert(0, str(ROOT / "backend" / "scripts"))
+    import validate_compose as vc
+
+    env = vc.load_env(ROOT / ".env.prod.example")
+    env.setdefault("POSTGRES_PASSWORD", "x" * 40)
+    base = vc.yaml.safe_load(vc.BASE_FILE.read_text(encoding="utf-8"))
+    overlay = vc.yaml.safe_load(vc.PROD_FILE.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    os.environ.setdefault("DOMAIN", "bodyvision.example.com")
+    return vc.interpolate(vc.merge(base, overlay), env, errors, "test")
+
+
 def _run(env_file: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--env", str(env_file)],
@@ -97,6 +113,67 @@ def test_dockerignore_excludes_secrets_and_user_data() -> None:
     content = (ROOT / ".dockerignore").read_text(encoding="utf-8")
     for entry in (".env", "backend/storage", "node_modules", "**/__pycache__"):
         assert entry in content
+
+
+def test_ops_image_ships_the_postgresql_client() -> None:
+    """A1: `backup`/`restore` usan `pg_dump`, `pg_restore` y `psql`.
+
+    La imagen de la API es `python:3.13-slim` y no trae el cliente, así que los
+    servicios de operación se construyen desde `docker/ops.Dockerfile`.
+    """
+    ops = ROOT / "docker" / "ops.Dockerfile"
+    assert ops.is_file(), "falta docker/ops.Dockerfile"
+    content = ops.read_text(encoding="utf-8")
+    assert content.startswith("# Imagen de operación")
+    assert "FROM postgres:" in content, "el cliente debe ser de la misma versión mayor"
+    assert "apk add --no-cache bash python3" in content
+    assert "USER app" in content, "no se ejecuta como root"
+
+    compose = (ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
+    for service in ("backup:", "restore:"):
+        block = compose.split(service, 1)[1]
+        assert "docker/ops.Dockerfile" in block, service
+        assert "PGPASSWORD" in block, service
+
+
+def test_retention_flags_are_appended_not_substituted() -> None:
+    """M3: `run --rm retention --apply` debe añadir el flag al módulo real."""
+    composed = _composed()
+    retention = composed["services"]["retention"]
+    entrypoint = " ".join(retention["entrypoint"])
+    command = " ".join(retention["command"])
+    assert "app.workers.retention_worker" in entrypoint
+    assert command == "--once"
+    assert "python" not in command
+
+
+def test_env_templates_cover_every_setting() -> None:
+    """A3: las plantillas no pueden quedarse atrás respecto a `Settings`."""
+    import os
+
+    os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://u:p@localhost:5432/db")
+    os.environ.setdefault("JWT_SECRET", "x" * 40)
+    sys.path.insert(0, str(ROOT / "backend"))
+
+    from app.core.config import Settings
+
+    fields = set(Settings.model_fields)
+
+    def keys(path: Path) -> set[str]:
+        found = set()
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                found.add(line.split("=", 1)[0].strip().lower())
+        return found
+
+    backend_env = keys(ROOT / "backend" / ".env.example")
+    assert not fields - backend_env, f"backend/.env.example sin: {sorted(fields - backend_env)}"
+
+    # En producción `DATABASE_URL` la compone Docker Compose con POSTGRES_*.
+    prod_env = keys(ROOT / ".env.prod.example")
+    missing = fields - prod_env - {"database_url"}
+    assert not missing, f".env.prod.example sin: {sorted(missing)}"
 
 
 def test_env_prod_template_has_no_real_secrets() -> None:

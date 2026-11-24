@@ -43,7 +43,8 @@ WHERE state = 'idle' AND query_start < now() - interval '30 minutes'
 ## Recuperación
 
 1. Restablecer `db` y confirmar `pg_isready`.
-2. `docker compose ... restart backend worker-*`.
+2. `docker compose ... restart backend worker-pose worker-report worker-simulation`
+   (Compose no expande comodines: hay que nombrarlos).
 3. `/api/health/ready` 200 y `/api/health/workers` con los 3 vivos.
 4. Verificar integridad: `SELECT count(*) FROM measurements;` coincide con lo esperado.
 

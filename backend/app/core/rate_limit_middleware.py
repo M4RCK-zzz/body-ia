@@ -5,8 +5,10 @@ gastar conexiones ni argon2. La identidad se resuelve así:
 
 1. `user`: el `sub` del JWT si la petición lo trae (sin verificarlo: solo cuenta).
 2. `email`: el campo `email` del cuerpo JSON en `/auth/login`.
-3. `ip`: `X-Forwarded-For` (primera IP) si el proxy es de confianza, si no la IP
-   de la conexión.
+3. `ip`: `X-Real-IP` (lo fija Nginx con `$remote_addr`, no el cliente) si el
+   proxy es de confianza; si no, la IP de la conexión. **Nunca** la primera IP de
+   `X-Forwarded-For`: ese extremo lo controla el cliente y rotarlo evadiría el
+   límite por IP.
 
 La clave se guarda **hasheada** en la decisión y en la auditoría: nunca se
 registra la IP ni el email en claro.
@@ -32,10 +34,17 @@ MAX_BODY_PEEK = 4096
 
 
 def _client_ip(request: Request, settings: Settings) -> str:
+    """IP a efectos de límite.
+
+    Con `TRUSTED_PROXIES=true` se usa `X-Real-IP`, que Nginx reescribe con
+    `$remote_addr`. `X-Forwarded-For` **no** se usa nunca: su primer salto lo
+    escribe el cliente y rotarlo evadiría el límite por IP (se conserva `X-Real-IP`
+    como el salto fiable). Sin proxy de confianza, la IP de la conexión TCP.
+    """
     if settings.trusted_proxies:
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip()
     return request.client.host if request.client else "unknown"
 
 

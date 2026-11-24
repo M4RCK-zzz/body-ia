@@ -4,6 +4,13 @@ import { humanAge, orderedWorkers } from "../format";
 import { useWorkersHealth } from "../hooks/useAdmin";
 
 export function WorkerStatusBadge({ worker }: { worker: WorkerHealth }) {
+  if (!worker.continuous) {
+    return (
+      <span className="badge badge--neutral" title="Worker one-shot: se ejecuta bajo demanda">
+        Bajo demanda
+      </span>
+    );
+  }
   if (!worker.alive) {
     return (
       <span className="badge badge--error" title="Sin latidos dentro del umbral">
@@ -23,15 +30,17 @@ export function WorkerStatusBadge({ worker }: { worker: WorkerHealth }) {
 
 export function WorkersTab() {
   const query = useWorkersHealth();
+  const hasContinuous = Boolean(query.data?.workers.some((worker) => worker.continuous));
 
   return (
     <div className="admin-tab">
       <section className="bv-panel" aria-labelledby="admin-workers-title">
         <h2 id="admin-workers-title">Estado de los workers</h2>
         <p className="bv-muted">
-          Latidos registrados en base de datos. Un worker se considera vivo si ha latido dentro del
-          umbral configurado (<code>WORKER_STALE_SECONDS</code>); esta vista se refresca sola cada
-          30 s.
+          Latidos registrados en base de datos. Un worker <strong>continuo</strong> se considera vivo
+          si ha latido dentro del umbral configurado (<code>WORKER_STALE_SECONDS</code>); la
+          retención es <strong>bajo demanda</strong> y su último latido solo se informa. Esta vista se
+          refresca sola cada 30 s.
         </p>
 
         {query.isLoading ? <p className="bv-muted">Consultando latidos…</p> : null}
@@ -115,7 +124,7 @@ export function WorkersTab() {
               </div>
             )}
 
-            {query.data.workers.length > 0 &&
+            {hasContinuous &&
             orderedWorkers(query.data.workers).length < WORKER_ORDER.length ? (
               <p className="bv-muted">
                 Faltan latidos de algún worker: puede que no esté desplegado en esta instalación (el

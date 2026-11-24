@@ -8,7 +8,7 @@ observabilidad por `request_id`, backups verificables y retención efectiva.
 
 | Documento | Contenido |
 |---|---|
-| `docs/ARQUITECTURA.md` | ADR-001 a **ADR-010** |
+| `docs/ARQUITECTURA.md` | **ADR-002 a ADR-012** (no existe ADR-001: la numeración arranca en el 002) |
 | `docs/QA_CHECKLIST.md` | Checklist de cierre con evidencia por ítem |
 | `docs/SEGURIDAD_Y_PRIVACIDAD.md` | Modelo de amenazas, mapa de datos y riesgos residuales |
 | `docs/runbooks/` | Despliegue, rollback, backup/restore, incidentes, rotación de claves, worker caído, disco lleno y BD caída |
@@ -26,3 +26,4 @@ observabilidad por `request_id`, backups verificables y retención efectiva.
 | 7 | Analítica descriptiva y reportes CSV/PDF (worker, auditoría, dashboard real) | Cerrada |
 | 8 | Simulación hipotética (escenarios aislados) | Cerrada |
 | 9 | Producción: despliegue endurecido, observabilidad, backups, retención, QA y ADR-010 | Cerrada |
+| — | Ampliaciones posteriores: panel de Administración (ADR-011) y ajustes del visor/listas (ADR-012) | Cerrada |

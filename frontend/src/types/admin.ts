@@ -62,6 +62,8 @@ export const ROLE_ORDER: RoleName[] = ["admin", "professional", "user"];
 export interface WorkerHealth {
   name: string;
   version: string;
+  /** `false` = worker one-shot (retención): su latido se informa, no degrada. */
+  continuous: boolean;
   alive: boolean;
   last_seen_at: string;
   age_seconds: number;

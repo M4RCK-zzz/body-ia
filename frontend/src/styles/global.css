@@ -146,12 +146,6 @@ code {
 }
 .nav-link--disabled { color: var(--text-3); cursor: not-allowed; }
 .nav-link--disabled:hover { background: transparent; border-color: transparent; color: var(--text-3); }
-.phase-tag {
-  font-size: 0.68rem; color: var(--text-2);
-  border: 1px solid var(--border-strong); border-radius: 999px;
-  padding: 1px 8px; background: var(--surface-2);
-}
-
 /* Grid y tarjetas */
 .grid { display: grid; gap: 16px; margin-bottom: 16px; }
 .grid--kpi { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }

@@ -54,9 +54,9 @@
 
 - [ ] **3.1** Suite completa en verde.
   - `cd backend && .venv\Scripts\python.exe -m pytest -q`
-  - Evidencia esperada: **418+ passed**, 0 failed (el número sube con cada suite nueva;
-    lo importante es 0 failed). Medición de cierre: **418 passed** (incluye 8 de
-    `test_deployment_assets.py`).
+  - Evidencia esperada: **443 passed**, 0 failed (el número sube con cada suite nueva;
+    lo importante es 0 failed). Medición de cierre: **443 passed** (incluye 11 de
+    `test_deployment_assets.py`, 13 de `test_health.py` y 11 de `test_rate_limit.py`).
 - [ ] **3.2** `ruff` sin ningún aviso (gate de CI, decisión D13).
   - `.venv\Scripts\ruff.exe check .` → `All checks passed!`
 - [ ] **3.3** Composición de producción validada sin Docker.
@@ -134,9 +134,11 @@
 - [ ] **7.3** `/api/health/live` responde 200 sin base de datos (parar `db`).
 - [ ] **7.4** `/api/health/ready` responde **503** con el componente que falla.
   - Parar `db` → `database: false`. Con `UPLOAD_DIR` de solo lectura → `storage: false`.
-- [ ] **7.5** `/api/health/workers` refleja los latidos.
-  - Los 3 workers levantados → `status: ok`, `alive: true`.
+- [ ] **7.5** `/api/health/workers` refleja los latidos (requiere una sesión `admin`).
+  - Sin token → `401`; con un usuario sin rol `admin` → `403 forbidden`.
+  - Los 3 workers continuos levantados → `status: ok`, `alive: true`.
   - Parar `worker-report` y esperar `WORKER_STALE_SECONDS` → `alive: false`.
+  - `retention` aparece con `continuous: false`: una pasada vieja **no** degrada el estado.
 
 ---
 
@@ -155,6 +157,8 @@
   `bash backend/scripts/restore.sh <dir> --skip-storage` (`bash -n` sin errores de sintaxis).
 - [ ] **8.5** Retención en **DRY RUN** por defecto.
   - `python -m app.workers.retention_worker --once` → informa `DRY RUN`, no borra nada.
+  - En el contenedor, los flags se **añaden** al comando:
+    `docker compose ... run --rm retention --apply` purga de verdad.
   - Evidencia automatizada: `pytest tests/test_retention_worker.py -q` → 5 passed
 - [ ] **8.6** Purga real audita cada borrado (`media.purged`, `report.purged`,
   `simulation.purged`) y **no toca** `measurements` ni `audit_events`.
@@ -253,7 +257,7 @@
 
 | Resultado | Valor |
 |---|---|
-| Ítems verificados | _n_ / 60 |
+| Ítems verificados | _n_ / 75 |
 | Fallos abiertos | _ninguno / lista_ |
 | Desviaciones respecto al plan | _ninguna / lista_ |
 | `pytest -q` | _passed_ |

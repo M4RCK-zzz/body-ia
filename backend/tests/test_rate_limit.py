@@ -131,3 +131,72 @@ def test_health_endpoints_are_not_limited(monkeypatch) -> None:
             assert client.get("/api/health/live").status_code == 200
     finally:
         get_settings.cache_clear()
+
+
+# --- A2: identidad de la IP y spoofing de cabeceras ---------------------------
+
+
+def test_client_ip_ignores_forwarded_for_when_proxies_are_untrusted() -> None:
+    """`TRUSTED_PROXIES=false` (el default): la cabecera del cliente no cuenta."""
+    from starlette.requests import Request
+
+    from app.core.rate_limit_middleware import _client_ip
+
+    settings = _settings(trusted_proxies=False)
+    scope = {
+        "type": "http",
+        "headers": [(b"x-forwarded-for", b"1.2.3.4"), (b"x-real-ip", b"5.6.7.8")],
+        "client": ("10.0.0.9", 12345),
+    }
+    assert _client_ip(Request(scope), settings) == "10.0.0.9"
+
+
+def test_client_ip_prefers_real_ip_from_the_trusted_proxy() -> None:
+    """Con proxy de confianza manda `X-Real-IP` (lo reescribe Nginx), no XFF."""
+    from starlette.requests import Request
+
+    from app.core.rate_limit_middleware import _client_ip
+
+    settings = _settings(trusted_proxies=True)
+    scope = {
+        "type": "http",
+        "headers": [(b"x-forwarded-for", b"1.2.3.4"), (b"x-real-ip", b"203.0.113.7")],
+        "client": ("10.0.0.9", 12345),
+    }
+    assert _client_ip(Request(scope), settings) == "203.0.113.7"
+
+
+def test_trusted_proxies_false_is_not_truthy() -> None:
+    """Regresión: con `str`, el literal "false" activaba la confianza en el proxy."""
+    assert _settings(trusted_proxies="false").trusted_proxies is False
+    assert _settings(trusted_proxies="0").trusted_proxies is False
+    assert _settings(trusted_proxies="true").trusted_proxies is True
+    assert _settings().trusted_proxies is False
+
+
+def test_rotating_headers_does_not_evade_the_ip_limit(monkeypatch) -> None:
+    """Rotar `X-Forwarded-For` no abre la puerta: el límite va por la IP real."""
+    monkeypatch.setenv("RATE_LIMIT_LOGIN_PER_MINUTE", "2")
+    monkeypatch.setenv("TRUSTED_PROXIES", "false")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        from app.api.deps import get_auth_service
+
+        app = create_app()
+        app.dependency_overrides[get_auth_service] = lambda: _RejectingAuthService()
+        client = TestClient(app)
+        codes = [
+            client.post(
+                "/api/auth/login",
+                json={"email": "a@b.co", "password": "no-valida-1"},
+                headers={"X-Forwarded-For": f"198.51.100.{i}", "X-Real-IP": f"198.51.100.{i}"},
+            ).status_code
+            for i in range(4)
+        ]
+        assert codes[:2] == [401, 401]
+        assert codes[2] == 429, codes
+        assert codes[3] == 429, codes
+    finally:
+        get_settings.cache_clear()

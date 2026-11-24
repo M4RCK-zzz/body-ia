@@ -42,6 +42,9 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-re
 | Certificado corporativo | Calendario con aviso 30 días antes |
 | Autofirmado (`ALLOW_SELFSIGNED=true`) | Solo pruebas; **no** usar en producción |
 
+Los certificados se montan en `docker/nginx/certs/` (`fullchain.pem` + `privkey.pem` +
+`chain.pem`): no hay variables `SSL_CERT`/`SSL_KEY` y las claves nunca entran al repo.
+
 ```bash
 # Comprobar caducidad
 openssl s_client -connect $DOMAIN:443 -servername $DOMAIN </dev/null 2>/dev/null \

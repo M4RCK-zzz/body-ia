@@ -48,3 +48,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec db \
 
 **Nota:** ningún elemento se reintenta automáticamente (decisión de fases 5/7/8). Un `failed`
 requiere acción del usuario; los `*_stale` los recupera el worker al arrancar.
+
+**`retention` no es un worker caído.** Se ejecuta como one-shot (`--once`, desde cron o a
+mano); en `/api/health/workers` aparece con `continuous: false` y su último latido es
+informativo: no altera `status` ni dispara `degraded`.

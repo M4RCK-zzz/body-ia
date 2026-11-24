@@ -131,8 +131,14 @@ Cross-Origin-Resource-Policy: same-origin
 | Resto | 600/min | IP |
 
 - `429` con `Retry-After`; event de log con la regla aplicada.
-- `/api/health*` y `/api/docs` **nunca** se limitan.
+- `/api/health*` y `/api/docs` **nunca** se limitan. `/api/health/workers` es la excepción
+  de contenido: exige `admin` (devuelve versiones, iteraciones y `last_error` internos).
 - La clave se guarda **hasheada** (SHA-256 truncado): ni IPs ni emails en claro.
+- **La IP no es falsificable.** Con `TRUSTED_PROXIES=true` la identidad sale de `X-Real-IP`,
+  que Nginx sobrescribe con `$remote_addr` (`proxy_set_header X-Real-IP $remote_addr`).
+  `X-Forwarded-For` **no se lee nunca**: su primer salto lo escribe el cliente y rotarlo
+  evadiría el límite. Con `TRUSTED_PROXIES=false` (default) se usa la IP de la conexión TCP.
+  `TRUSTED_PROXIES` es `bool`: el literal `"false"` nunca activa la confianza.
 
 ### 4.6 Protección de archivos
 

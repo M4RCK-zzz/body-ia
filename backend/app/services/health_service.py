@@ -27,6 +27,11 @@ from app.schemas.health import (
 # Contrato del storage: se escribe y se borra una clave de prueba efímera.
 _PROBE_KEY = "00000000000000000000000000000000"
 
+# Workers que corren en bucle: su latido debe ser reciente para el estado global.
+# `retention` es one-shot (se ejecuta con `--once` desde cron o a mano), así que
+# su último latido se muestra como información y nunca degrada el servicio.
+CONTINUOUS_WORKERS: frozenset[str] = frozenset({"pose", "report", "simulation"})
+
 
 class HealthService:
     def __init__(
@@ -97,21 +102,26 @@ class HealthService:
             if last_seen.tzinfo is None:  # defensa: BD sin tz
                 last_seen = last_seen.replace(tzinfo=UTC)
             age = int((now - last_seen).total_seconds())
+            continuous = row.name in CONTINUOUS_WORKERS
             workers.append(
                 WorkerHealth(
                     name=row.name,
                     version=row.worker_version,
-                    alive=age <= stale_after,
+                    continuous=continuous,
+                    # Un worker one-shot no puede estar "caído": no hay proceso
+                    # esperando. Se informa su última pasada sin evaluar el umbral.
+                    alive=(age <= stale_after) if continuous else True,
                     last_seen_at=last_seen,
                     age_seconds=age,
                     iterations=row.iterations,
                     last_error=row.last_error,
                 )
             )
+        monitored = [w for w in workers if w.continuous]
         return WorkersResponse(
             status="ok"
-            if workers and all(w.alive for w in workers)
-            else ("degraded" if workers else "unknown"),
+            if monitored and all(w.alive for w in monitored)
+            else ("degraded" if monitored else "unknown"),
             stale_after_seconds=stale_after,
             workers=workers,
             timestamp=now,

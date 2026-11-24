@@ -1,6 +1,12 @@
 # Fase 9 — Producción, QA y mantenimiento (plan técnico)
 
-**Estado:** propuesta, pendiente de confirmación. **No se ha escrito código de Fase 9.**
+> **Documento histórico.** Es el plan con el que se ejecutó la Fase 9 y se conserva como
+> registro de decisiones. El estado real del repositorio está en `README.md`,
+> `docs/ARQUITECTURA.md` (ADR-002…ADR-012) y `docs/QA_CHECKLIST.md`. Algunas rutas citadas
+> aquí son las previstas en el plan, no las finales (p. ej. `app/workers/retention.py` es
+> hoy `app/workers/retention_worker.py`); no hay variables `SSL_CERT`/`SSL_KEY`.
+
+**Estado:** ejecutado y cerrado (se conserva el texto original del plan).
 
 > Regla rectora: la Fase 9 no añade producto nuevo. Endurece lo que ya existe, hace
 > observable y recuperable lo que ya funciona, y deja por escrito cómo se opera. Ningún

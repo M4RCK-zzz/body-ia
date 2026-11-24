@@ -33,8 +33,9 @@ class Settings(BaseSettings):
     security_headers: bool = True
     hsts_max_age: int = Field(default=31_536_000, ge=0, le=63_072_000)
     hsts_include_subdomains: bool = True
-    # Orígenes permitidos para el visor/malla: nunca "*".
-    trusted_proxies: str = ""
+    # Confiar en las cabeceras del proxy inverso (`X-Real-IP`). Debe ser `bool`:
+    # con `str`, el literal "false" sería truthy y abriría el spoofing de IP.
+    trusted_proxies: bool = False
 
     # --- Rate limiting (Fase 9) ---
     rate_limit_enabled: bool = True
