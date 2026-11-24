@@ -55,6 +55,9 @@ class AuditAction(StrEnum):
     SIMULATION_FAILED = "simulation.failed"
     SIMULATION_ARCHIVED = "simulation.archived"
     SIMULATION_VIEWED = "simulation.viewed"
+    MEDIA_PURGED = "media.purged"
+    REPORT_PURGED = "report.purged"
+    SIMULATION_PURGED = "simulation.purged"
 
 
 MIN_PASSWORD_LENGTH = 10

@@ -1,0 +1,111 @@
+# Servidor del borde: HTTP -> HTTPS, SPA y proxy /api (Fase 9).
+#
+# `DOMAIN` se sustituye en tiempo de arranque por el entrypoint de la imagen
+# (envsubst sobre /etc/nginx/templates → conf.d). Plantilla, no configuración
+# final: el dominio nunca se escribe en el repo.
+
+upstream bodyvision_api {
+    server backend:8000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    # Healthcheck interno de Nginx (no se limita, no se redirige).
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    # ACME (Let's Encrypt) por si se usa webroot.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_trusted_certificate /etc/nginx/certs/chain.pem;
+
+    include /etc/nginx/snippets/security-headers.conf;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # --- estáticos ---------------------------------------------------------
+    # Assets con hash en el nombre: cacheables para siempre.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # Modelos 3D y Draco: pesados y versionados por nombre.
+    location /models/ {
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
+        try_files $uri =404;
+    }
+
+    location /draco/ {
+        expires 30d;
+        types {
+            application/wasm wasm;
+        }
+        add_header Cache-Control "public, max-age=2592000";
+        try_files $uri =404;
+    }
+
+    # `index.html` nunca se cachea: es lo que apunta a los assets nuevos.
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    # --- API (mismo origen) ------------------------------------------------
+    location /api/auth/login {
+        limit_req zone=login burst=3 nodelay;
+        proxy_pass http://bodyvision_api;
+        include /etc/nginx/snippets/proxy-headers.conf;
+    }
+
+    location /api/health/ {
+        # Los healthchecks de la infraestructura nunca se limitan.
+        proxy_pass http://bodyvision_api;
+        include /etc/nginx/snippets/proxy-headers.conf;
+        access_log off;
+    }
+
+    location /api/ {
+        limit_req zone=api burst=40 nodelay;
+        proxy_pass http://bodyvision_api;
+        include /etc/nginx/snippets/proxy-headers.conf;
+
+        # Descargas autenticadas: no se cachean en ningún intermediario.
+        proxy_buffering on;
+        proxy_read_timeout 120s;
+    }
+
+    # --- SPA ---------------------------------------------------------------
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Nada de listar directorios ni ficheros ocultos.
+    location ~ /\. {
+        deny all;
+    }
+}

@@ -198,6 +198,16 @@ class InMemoryMediaRepository(MediaRepository):
         rows.sort(key=lambda a: (a.uploaded_at, a.id), reverse=True)
         return rows[offset : offset + limit], len(rows)
 
+    def expired_for_retention(self, now) -> list[MediaAsset]:
+        return [
+            a
+            for a in self.items
+            if a.retention_until is not None
+            and a.retention_until < now
+            and a.status in {"ready", "rejected"}
+            and a.storage_key is not None
+        ]
+
 
 class InMemoryPoseRepository(PoseRepository):
     def __init__(self) -> None:
@@ -439,6 +449,16 @@ class InMemoryReportRepository(ReportRepository):
         rows.sort(key=lambda r: r.created_at, reverse=True)
         return rows[offset : offset + limit], len(rows)
 
+    def expired_for_retention(self, cutoff) -> list[Report]:
+        return [
+            r
+            for r in self.items
+            if r.status in {"generated", "failed"}
+            and r.completed_at is not None
+            and r.completed_at < cutoff
+            and r.storage_key is not None
+        ]
+
     def list_page_for_user(
         self, *, requested_by_user_id: UUID, status: str | None, limit: int, offset: int
     ) -> tuple[list[Report], int]:
@@ -640,6 +660,16 @@ class InMemorySimulationRepository(SimulationRepository):
             for s in self.items
             if s.profile_id == profile_id and s.status in ("draft", "queued")
         )
+
+    def expired_for_retention(self, cutoff) -> list[Simulation]:
+        return [
+            s
+            for s in self.items
+            if s.status == "archived"
+            and s.archived_at is not None
+            and s.archived_at < cutoff
+            and s.result_json is not None
+        ]
 
     def claim_next(self) -> Simulation | None:
         rows = [s for s in self.items if s.status == "queued"]

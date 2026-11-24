@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from app.models.media import MediaAsset
@@ -25,3 +26,7 @@ class MediaRepository(ABC):
         limit: int,
         offset: int,
     ) -> tuple[list[MediaAsset], int]: ...
+
+    @abstractmethod
+    def expired_for_retention(self, now: datetime) -> list[MediaAsset]:
+        """Assets con `retention_until < now` que aún conservan binario (Fase 9)."""

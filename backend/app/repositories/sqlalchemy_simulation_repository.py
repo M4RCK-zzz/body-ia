@@ -137,3 +137,14 @@ class SqlAlchemySimulationRepository(SimulationRepository):
                 )
             count += 1
         return count
+
+    def expired_for_retention(self, cutoff: datetime) -> list[Simulation]:
+        rows = self._session.scalars(
+            select(Simulation).where(
+                Simulation.status == SimulationStatus.ARCHIVED.value,
+                Simulation.archived_at.isnot(None),
+                Simulation.archived_at < cutoff,
+                Simulation.result_json.isnot(None),
+            )
+        ).all()
+        return list(rows)

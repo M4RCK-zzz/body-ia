@@ -1,0 +1,23 @@
+# Nunca dentro del contexto de build: secretos, datos de usuario y artefactos.
+.git
+.env
+.env.*
+!.env.example
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+**/dist
+**/.tsbuildinfo
+backend/storage
+backend/models
+backend/models_ai
+.uipreview
+.tmp
+*.task
+*.log
+
+# Certificados TLS (clave privada): se montan en el frontend, nunca se copian al build
+docker/nginx/certs

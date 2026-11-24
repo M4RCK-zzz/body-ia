@@ -26,6 +26,7 @@ from app.integrations.storage.local import LocalStorageBackend
 from app.models.pose import PoseAnalysis
 from app.services.audit_service import AuditRecorder
 from app.services.ports import Transaction
+from app.workers.heartbeat import Heartbeat
 from app.workers.pose_runner import PoseModelError, PoseModelRunner, PoseResult
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class PoseWorker:
         media_repo,
         audit: AuditRecorder,
         tx: Transaction,
+        heartbeat_repo=None,
         clock: Callable = utcnow,
     ) -> None:
         self._storage = storage
@@ -56,6 +58,7 @@ class PoseWorker:
         self._audit = audit
         self._tx = tx
         self._clock = clock
+        self._heartbeat = Heartbeat("pose", heartbeat_repo, tx, clock=clock)
 
     # --- internas ---
 
@@ -205,6 +208,7 @@ class PoseWorker:
             return False
         if task is None:
             self._tx.commit()
+            self._heartbeat.beat()
             return False
 
         # 3. processing
@@ -269,6 +273,7 @@ class PoseWorker:
             while True:
                 try:
                     self.run_once()
+                    self._heartbeat.beat()
                 except Exception:
                     logger.exception("Error inesperado en run_once")
                 time.sleep(poll)
@@ -296,6 +301,9 @@ def main(argv=None) -> int:
     from app.repositories.sqlalchemy_audit_repository import SqlAlchemyAuditRepository
     from app.repositories.sqlalchemy_media_repository import SqlAlchemyMediaRepository
     from app.repositories.sqlalchemy_pose_repository import SqlAlchemyPoseRepository
+    from app.repositories.worker_heartbeat_repository import (
+        SqlAlchemyWorkerHeartbeatRepository,
+    )
     from app.services.audit_service import AuditRecorder
 
     storage = LocalStorageBackend(settings.upload_dir)
@@ -311,6 +319,7 @@ def main(argv=None) -> int:
             media_repo=SqlAlchemyMediaRepository(session),
             audit=audit,
             tx=SessionTransaction(session),
+            heartbeat_repo=SqlAlchemyWorkerHeartbeatRepository(session),
         )
         return worker.run_forever()
     finally:

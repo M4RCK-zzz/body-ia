@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
@@ -23,7 +24,7 @@ def _read(asset) -> MediaAssetRead:
 def upload_media(
     profile_id: UUID,
     user: CurrentUser,
-    file: UploadFile = File(..., description="Imagen JPEG/PNG/WebP (máx. 50 MB)"),
+    file: Annotated[UploadFile, File(description="Imagen JPEG/PNG/WebP (máx. 50 MB)")],
     service: MediaService = Depends(get_media_service),  # noqa: B008 - patrón del repo
 ) -> MediaAssetRead:
     data = file.file.read(service.max_upload_bytes + 1)

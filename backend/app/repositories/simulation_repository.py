@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from app.models.simulation import Simulation, SimulationBaseline
@@ -56,3 +57,7 @@ class SimulationRepository(ABC):
     @abstractmethod
     def mark_stale_failed(self, stale_before, *, now, reason: str) -> int:
         """Marca `failed` los `queued`/`processing` abandonados. Devuelve el conteo."""
+
+    @abstractmethod
+    def expired_for_retention(self, cutoff: datetime) -> list[Simulation]:
+        """Escenarios archivados con `archived_at < cutoff` (Fase 9)."""

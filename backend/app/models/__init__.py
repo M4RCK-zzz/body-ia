@@ -8,6 +8,7 @@ from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
 from app.models.report import Report
 from app.models.simulation import Simulation, SimulationBaseline
+from app.models.worker_heartbeat import WorkerHeartbeat
 
 __all__ = [
     "AuditEvent",
@@ -23,5 +24,6 @@ __all__ = [
     "Simulation",
     "SimulationBaseline",
     "User",
+    "WorkerHeartbeat",
     "user_roles",
 ]

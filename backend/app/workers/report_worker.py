@@ -38,6 +38,7 @@ from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditRecorder
 from app.services.ports import Transaction
 from app.services.report_renderers import ReportContext, render_report
+from app.workers.heartbeat import Heartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class ReportWorker:
         pose_repo,
         audit: AuditRecorder,
         tx: Transaction,
+        heartbeat_repo=None,
         clock: Callable = utcnow,
     ) -> None:
         self._storage = storage
@@ -67,6 +69,7 @@ class ReportWorker:
         self._audit = audit
         self._tx = tx
         self._clock = clock
+        self._heartbeat = Heartbeat("report", heartbeat_repo, tx, clock=clock)
 
     # --- internas ---
 
@@ -207,6 +210,7 @@ class ReportWorker:
             return False
         if report is None:
             self._tx.commit()
+            self._heartbeat.beat()
             return False
 
         report.status = ReportStatus.PROCESSING.value
@@ -266,6 +270,7 @@ class ReportWorker:
             while True:
                 try:
                     self.run_once()
+                    self._heartbeat.beat()
                 except Exception:
                     logger.exception("Error inesperado en run_once (reportes)")
                 time.sleep(poll)
@@ -309,6 +314,9 @@ def main(argv=None) -> int:
     from app.repositories.sqlalchemy_pose_repository import SqlAlchemyPoseRepository
     from app.repositories.sqlalchemy_profile_repository import SqlAlchemyProfileRepository
     from app.repositories.sqlalchemy_report_repository import SqlAlchemyReportRepository
+    from app.repositories.worker_heartbeat_repository import (
+        SqlAlchemyWorkerHeartbeatRepository,
+    )
     from app.services.access_guard import AccessGuard
     from app.services.analytics_service import AnalyticsService
 
@@ -340,6 +348,7 @@ def main(argv=None) -> int:
             pose_repo=SqlAlchemyPoseRepository(session),
             audit=audit,
             tx=tx,
+            heartbeat_repo=SqlAlchemyWorkerHeartbeatRepository(session),
         )
         if args.once:
             while worker.run_once():

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -45,3 +46,14 @@ class SqlAlchemyMediaRepository(MediaRepository):
         total = self._session.scalar(select(func.count()).select_from(base.subquery())) or 0
         rows = self._session.execute(base.limit(limit).offset(offset)).scalars().all()
         return list(rows), total
+
+    def expired_for_retention(self, now: datetime) -> list[MediaAsset]:
+        """Solo assets vigentes con binario; los `deleted` ya se purgaron."""
+        rows = self._session.scalars(
+            select(MediaAsset).where(
+                MediaAsset.retention_until < now,
+                MediaAsset.status.in_(["ready", "rejected"]),
+                MediaAsset.storage_key.isnot(None),
+            )
+        ).all()
+        return list(rows)

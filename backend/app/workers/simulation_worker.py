@@ -37,6 +37,7 @@ from app.domain.simulation import (
 from app.models.simulation import Simulation
 from app.services.audit_service import AuditRecorder
 from app.services.ports import Transaction
+from app.workers.heartbeat import Heartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ class SimulationWorker:
         simulation_repo,
         audit: AuditRecorder,
         tx: Transaction,
+        heartbeat_repo=None,
         clock: Callable = utcnow,
     ) -> None:
         self._settings = settings
@@ -58,6 +60,7 @@ class SimulationWorker:
         self._audit = audit
         self._tx = tx
         self._clock = clock
+        self._heartbeat = Heartbeat("simulation", heartbeat_repo, tx, clock=clock)
 
     # --- internas ---
 
@@ -153,6 +156,7 @@ class SimulationWorker:
             return False
         if simulation is None:
             self._tx.commit()
+            self._heartbeat.beat()
             return False
 
         # Sin estado `processing` en el modelo aprobado: la fila sigue `queued`
@@ -216,6 +220,7 @@ class SimulationWorker:
             while True:
                 try:
                     self.run_once()
+                    self._heartbeat.beat()
                 except Exception:  # noqa: BLE001 - el worker no debe caerse
                     logger.exception("Error inesperado en run_once (simulación)")
                 time.sleep(poll)
@@ -245,6 +250,9 @@ def main(argv=None) -> int:
     from app.repositories.sqlalchemy_simulation_repository import (
         SqlAlchemySimulationRepository,
     )
+    from app.repositories.worker_heartbeat_repository import (
+        SqlAlchemyWorkerHeartbeatRepository,
+    )
 
     settings = get_settings()
     session = SessionLocal()
@@ -255,6 +263,7 @@ def main(argv=None) -> int:
             simulation_repo=SqlAlchemySimulationRepository(session),
             audit=audit,
             tx=SessionTransaction(session),
+            heartbeat_repo=SqlAlchemyWorkerHeartbeatRepository(session),
         )
         if args.once:
             while worker.run_once():

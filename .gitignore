@@ -2,6 +2,14 @@
 .env
 .env.*
 !.env.example
+!.env.prod.example
+
+# Backups locales (nunca al repo)
+backups/
+
+# Certificados TLS (claves privadas: nunca al repo)
+docker/nginx/certs/*
+!docker/nginx/certs/.gitkeep
 
 # Python
 __pycache__/

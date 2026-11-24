@@ -34,10 +34,26 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
-const BASE_URL =
-  (import.meta.env.VITE_API_URL as string | undefined) ??
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://127.0.0.1:8000";
+/** Origen de la API.
+ *
+ * - Definido (`VITE_API_URL`) → ese origen, p. ej. `http://127.0.0.1:8000` en local.
+ * - Vacío en producción → **mismo origen**: Nginx hace de proxy de `/api`, así el
+ *   navegador nunca cruza orígenes y la CSP puede ser `connect-src 'self'`.
+ * - Sin definir (dev con Vite) → `http://127.0.0.1:8000`, igual que antes.
+ *
+ * Distinguir "vacío" de "sin definir" es clave: con `""` y `??` se caía en el
+ * fallback de localhost y el despliegue en contenedor apuntaba a la máquina del
+ * usuario.
+ */
+function resolveApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_URL as string | undefined;
+  if (configured !== undefined) return configured.replace(/\/+$/, "");
+  const legacy = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (legacy !== undefined && legacy !== "") return legacy.replace(/\/+$/, "");
+  return "http://127.0.0.1:8000";
+}
+
+const BASE_URL = resolveApiBaseUrl();
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -71,7 +87,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options;
 
-  const url = new URL(path, BASE_URL);
+  // `BASE_URL === ""` (mismo origen): `new URL("/api/x", "")` lanzaría. Se usa el
+  // origen actual del documento como base, que es exactamente lo que se quiere.
+  const url = new URL(path, BASE_URL || window.location.origin);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, String(value));
@@ -100,9 +118,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     else signal.addEventListener("abort", onExternalAbort, { once: true });
   }
 
+  // Con `BASE_URL` vacío la URL ya es absoluta (mismo origen): `fetch` no
+  // necesita nada más. Con base explícita se usa la URL completa.
+  const target = BASE_URL ? url.toString() : `${url.pathname}${url.search}`;
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await fetch(target, {
       method,
       headers,
       body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,

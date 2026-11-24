@@ -1,0 +1,239 @@
+# Overlay de producción BODYVISION AI (Fase 9).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Se apoya en el compose base (PostgreSQL + pgadmin opcional de herramientas) y
+# añade API, workers y frontend/Nginx. Nada de `build` implícito: las imágenes
+# se construyen con las rutas de `docker/` y se etiquetan por versión.
+
+name: bodyvision
+
+services:
+  db:
+    # En producción la base NO se publica: solo se llega por la red interna.
+    ports: []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env.prod}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=100
+      - -c
+      - log_min_duration_statement=1000
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # Job one-shot: aplica migraciones y termina. La API espera a que salga bien
+  # (decisión D3: nunca se migra desde el CMD de la API ni del worker).
+  migrate:
+    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    restart: "no"
+    env_file: [.env.prod]
+    environment:
+      # El host de la BD dentro de la red de Compose.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    restart: unless-stopped
+    env_file: [.env.prod]
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      ENABLE_API_DOCS: "false"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      # Sin TLS en el proxy interno: TLS termina en Nginx.
+      CORS_ORIGINS: https://${DOMAIN:?Define DOMAIN en .env.prod}
+      TRUSTED_PROXIES: "true"
+      LOG_JSON: "true"
+      UPLOAD_DIR: /app/storage
+      POSE_MODEL_PATH: /app/models/pose_landmarker_full.task
+    volumes:
+      - bodyvision_storage:/app/storage
+      - ./backend/models:/app/models:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=5).status == 200 else 1)"
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  worker-pose:
+    image: bodyvision-worker-pose:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/worker-pose.Dockerfile
+    restart: unless-stopped
+    env_file: [.env.prod]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      LOG_JSON: "true"
+      UPLOAD_DIR: /app/storage
+      POSE_MODEL_PATH: /app/models/pose_landmarker_full.task
+    volumes:
+      - bodyvision_storage:/app/storage
+      - ./backend/models:/app/models:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    # El latido real está en la BD (`/api/health/workers`); aquí solo se
+    # comprueba que el proceso sigue vivo y puede importar su módulo.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import app.workers.pose_worker"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  worker-report:
+    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    restart: unless-stopped
+    env_file: [.env.prod]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      LOG_JSON: "true"
+      UPLOAD_DIR: /app/storage
+    command: ["python", "-m", "app.workers.report_worker"]
+    volumes:
+      - bodyvision_storage:/app/storage
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import app.workers.report_worker"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  worker-simulation:
+    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    restart: unless-stopped
+    env_file: [.env.prod]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      LOG_JSON: "true"
+      UPLOAD_DIR: /app/storage
+    command: ["python", "-m", "app.workers.simulation_worker"]
+    volumes:
+      - bodyvision_storage:/app/storage
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import app.workers.simulation_worker"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  frontend:
+    image: bodyvision-web:${APP_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_URL: ""
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Define DOMAIN en .env.prod}
+      # true = genera un certificado autofirmado si faltan los ficheros (solo pruebas)
+      ALLOW_SELFSIGNED: ${ALLOW_SELFSIGNED:-false}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Certificados en disco: deja aquí fullchain.pem + privkey.pem (Let's Encrypt o
+      # corporativo) o genera unos autofirmados con scripts/tls-selfsigned.ps1|.sh
+      # y arranca con ALLOW_SELFSIGNED=true (solo pruebas).
+      - ./docker/nginx/certs:/etc/nginx/certs
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # Purga de retención: una pasada por ejecución, no un servicio permanente.
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  #     run --rm retention --once [--apply]
+  retention:
+    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    profiles: ["ops"]
+    env_file: [.env.prod]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      LOG_JSON: "true"
+      UPLOAD_DIR: /app/storage
+      RETENTION_DRY_RUN: ${RETENTION_DRY_RUN:-true}
+    command: ["python", "-m", "app.workers.retention_worker", "--once"]
+    volumes:
+      - bodyvision_storage:/app/storage
+    depends_on:
+      backend:
+        condition: service_started
+
+  # Backup manual/programado desde el host: `docker compose ... run --rm backup`
+  backup:
+    image: bodyvision-api:${APP_VERSION:-0.1.0}
+    profiles: ["ops"]
+    env_file: [.env.prod]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bodyvision}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bodyvision}
+      UPLOAD_DIR: /app/storage
+      BACKUP_DIR: /backups
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    entrypoint: ["bash", "/app/scripts/backup.sh"]
+    volumes:
+      - bodyvision_storage:/app/storage
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  bodyvision_storage:

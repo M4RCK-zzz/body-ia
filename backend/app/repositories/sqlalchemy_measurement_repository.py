@@ -63,7 +63,9 @@ class SqlAlchemyMeasurementRepository(MeasurementRepository):
             conditions.append(Measurement.metric_type == metric_type.value)
         if only_current:
             newer = aliased(Measurement)
-            conditions.append(~select(newer.id).where(newer.supersedes_id == Measurement.id).exists())
+            conditions.append(
+                ~select(newer.id).where(newer.supersedes_id == Measurement.id).exists()
+            )
         if date_from is not None:
             conditions.append(Measurement.measured_at >= date_from)
         if date_to is not None:

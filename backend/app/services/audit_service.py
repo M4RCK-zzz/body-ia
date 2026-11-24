@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
+from app.core.logging import request_id_ctx
 from app.models.audit_event import AuditEvent
 from app.repositories.audit_repository import AuditRepository
 
@@ -32,6 +33,12 @@ class AuditRecorder:
         profile_id: uuid.UUID | None = None,
         detail: dict[str, Any] | None = None,
     ) -> None:
+        # `request_id` del middleware (Fase 9): permite cruzar un evento de
+        # auditoría con la línea de log de la petición. Se guarda en `detail`
+        # (jsonb), así que no hace falta migración.
+        correlation = request_id_ctx.get()
+        if correlation:
+            detail = {**(detail or {}), "request_id": correlation}
         self._repository.add(
             AuditEvent(
                 id=uuid.uuid4(),

@@ -70,7 +70,9 @@ class MeasurementService:
     def _write_access(self, actor: User, profile_id: UUID) -> Profile:
         profile, _ = self._guard.require(profile_id, actor, AccessLevel.EDITOR)
         if profile.status != ProfileStatus.ACTIVE.value:
-            raise BusinessRuleError("El expediente no está activo: no admite cambios en mediciones.")
+            raise BusinessRuleError(
+                "El expediente no está activo: no admite cambios en mediciones."
+            )
         self._consents.ensure_valid(profile_id)
         return profile
 

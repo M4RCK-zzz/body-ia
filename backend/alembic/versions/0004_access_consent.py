@@ -7,6 +7,7 @@ Revises: 0003
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0004"
@@ -70,7 +71,9 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="RESTRICT"),
             nullable=True,
         ),
-        sa.CheckConstraint("level IN ('owner', 'editor', 'viewer')", name="ck_profile_access_level"),
+        sa.CheckConstraint(
+            "level IN ('owner', 'editor', 'viewer')", name="ck_profile_access_level"
+        ),
     )
     op.create_index(
         "uq_profile_access_active",

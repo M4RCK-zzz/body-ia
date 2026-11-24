@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.core.security_headers import apply_to_response
+
 
 class AppError(Exception):
     status_code: int = 400
@@ -79,6 +81,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         from app.core.config import get_settings
 
         origin = request.headers.get("origin")
+        settings = get_settings()
+        request_id = getattr(request.state, "request_id", None)
         response = JSONResponse(
             status_code=500,
             content={
@@ -88,6 +92,11 @@ def register_exception_handlers(app: FastAPI) -> None:
                 }
             },
         )
-        for key, value in cors_headers_for_origin(origin, get_settings().cors_origins_list).items():
+        if request_id:
+            response.headers["X-Request-ID"] = request_id
+        for key, value in cors_headers_for_origin(origin, settings.cors_origins_list).items():
             response.headers[key] = value
+        # El 500 sale por `ServerErrorMiddleware`, fuera del middleware de
+        # cabeceras: se aplican aquí para no dejar una respuesta sin CSP/HSTS.
+        apply_to_response(response, settings)
         return response

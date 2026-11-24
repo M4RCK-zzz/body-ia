@@ -7,8 +7,9 @@ Revises: 0005
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "0006"
 down_revision = "0005"
@@ -50,7 +51,9 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("duration_ms", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+        ),
         sa.CheckConstraint(
             "status IN ('queued', 'processing', 'completed', 'failed', 'needs_review')",
             name="ck_pose_analyses_status",
@@ -69,7 +72,9 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_pose_analyses_media_asset_id", "pose_analyses", ["media_asset_id"])
-    op.create_index("ix_pose_analyses_profile_created_at", "pose_analyses", ["profile_id", "created_at"])
+    op.create_index(
+        "ix_pose_analyses_profile_created_at", "pose_analyses", ["profile_id", "created_at"]
+    )
     op.create_index("ix_pose_analyses_status_created_at", "pose_analyses", ["status", "created_at"])
 
 

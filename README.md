@@ -5,9 +5,9 @@ Plataforma paramétrica de análisis, captura y simulación 3D de mediciones cor
 *escenario hipotético* separado de las mediciones reales.
 
 ## Requisitos
-- Docker Desktop (PostgreSQL)
-- Python 3.11 (backend, `venv`)
-- Node 20 LTS + npm
+- Docker Desktop (PostgreSQL; en producción, el stack completo con `docker compose`)
+- Python 3.13 (backend, `venv`; CI y despliegue usan 3.13)
+- Node 22 + **npm** (único gestor: `package-lock.json`)
 
 ## 1. Base de datos
 ```powershell
@@ -310,3 +310,108 @@ Checklist manual:
 7. Corregir una medición usada como base → el escenario antiguo mantiene su copia y avisa
    "base corregida después de calcularlo".
 8. Archivar un escenario con otro usuario (sin `OWNER`) → `insufficient_access`.
+
+## Fase 9 - Producción, QA y operación
+
+La Fase 9 **no añade producto**: hace que lo construido en las fases 1–8 se pueda
+desplegar, observar y recuperar.
+
+### Despliegue con Docker
+
+```powershell
+Copy-Item .env.prod.example .env.prod     # rellena DOMAIN, POSTGRES_PASSWORD y JWT_SECRET
+# Prueba local con HTTPS autofirmado:
+#   DOMAIN=localhost  ALLOW_SELFSIGNED=true
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+- **Nginx** sirve la SPA y hace de proxy de `/api` **bajo el mismo origen** (TLS, CSP,
+  HSTS, `limit_req`).
+- **API, worker de pose, worker de reportes y worker de simulación** en contenedores
+  separados; el de pose usa su propia imagen (MediaPipe necesita `libgl1`).
+- **Migraciones** en un job one-shot `migrate`; la API espera a que termine.
+- La base **no publica puertos** y corre como usuario sin privilegios en la app.
+- `VITE_API_URL=""` en producción → URLs relativas (mismo origen).
+
+### TLS
+
+Los certificados viven en `docker/nginx/certs/` (bind mount, **ignorado por git** porque
+contiene la clave privada):
+
+```powershell
+# Opción A — Let's Encrypt: copia /etc/letsencrypt/live/$DOMAIN/ (fullchain.pem + privkey.pem)
+# Opción B — certificado corporativo: deja ahí los dos ficheros
+# Opción C — pruebas locales con HTTPS autofirmado:
+powershell -ExecutionPolicy Bypass -File scripts\tls-selfsigned.ps1 -Domain localhost
+#   (Linux: bash scripts/tls-selfsigned.sh localhost)
+#   o, sin generar nada antes, arranca con ALLOW_SELFSIGNED=true y Nginx lo crea al arrancar.
+```
+
+El certificado autofirmado sirve para verificar que HTTPS, HSTS, CSP y el proxy funcionan
+antes de tener el certificado real. **No** se usa en producción.
+
+### Comprobaciones de seguridad y salud
+
+| Endpoint | Qué responde |
+|---|---|
+| `GET /api/health/live` | El proceso vive (no consulta la BD) |
+| `GET /api/health` | Compatibilidad: estado de la BD |
+| `GET /api/health/ready` | BD + **escritura real en storage** + migraciones al día (503 si falla) |
+| `GET /api/health/workers` | Latidos de los workers frente a `WORKER_STALE_SECONDS` |
+
+- **Rate limiting** por endpoint (login 5/min + 20/h por email, subidas 60/h, descargas
+  120/h, techo 600/min) con `429` y `Retry-After`. `/api/health*` nunca se limita.
+- **Cabeceras** en dos capas (FastAPI y Nginx), con CSP que permite **Draco WASM** del visor
+  3D (`'wasm-unsafe-eval'`, `worker-src blob:`) sin abrir `unsafe-eval` de JavaScript.
+- **`X-Request-ID`** correlaciona cabecera, log JSON y `audit_events.detail`.
+- En producción la API **no arranca** con `DEBUG=true`, CORS `*` o `http://`,
+  `ENABLE_API_DOCS=true` o un `JWT_SECRET` débil.
+- `/api/docs` está **cerrado** en producción (activo en local y staging).
+
+### Backups y retención
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File backend\scripts\backup.ps1 -OutDir D:\backups
+# Restauración VERIFICADA en una base nueva (obligatoria)
+powershell -ExecutionPolicy Bypass -File backend\scripts\restore.ps1 -From D:\backups\<ts> -TargetDatabase bodyvision_qa
+
+# Linux
+bash backend/scripts/backup.sh
+bash backend/scripts/restore.sh /backups/<ts> --target bodyvision_qa
+```
+
+Cada backup produce `db.dump` (`pg_dump -Fc`), `storage.tar` (imágenes y binarios de reportes,
+que **no** están en PostgreSQL) y `manifest.json` con SHA-256 y conteos por tabla. El restore
+compara los conteos y falla si no cuadran. **RPO 24 h / RTO 2 h.**
+
+La **retención** por fin se aplica: `python -m app.workers.retention_worker --once` purga
+media, reportes y resultados de escenarios caducados, con `RETENTION_DRY_RUN=true` por defecto
+y auditoría de cada borrado. Nunca toca `measurements`, `pose_analyses` ni `audit_events`.
+
+### Verificación de Fase 9
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m pytest -q        # 416+ passed
+.venv\Scripts\ruff.exe check .                 # 0 avisos
+cd ..\frontend
+npm run lint
+npm run build
+cd ..
+python backend\scripts\validate_compose.py --env .env.prod
+```
+
+CI (`.github/workflows/ci.yml`): backend con PostgreSQL 16 de servicio (migraciones de ida y
+vuelta + `alembic check` + pytest + ruff), frontend (`npm ci` + lint + build con
+`VITE_API_URL=""`) y validación de la composición. **Sin despliegue automático.**
+
+### Documentación de cierre
+
+- `docs/QA_CHECKLIST.md` — 60 ítems con comando, evidencia y firma.
+- `docs/SEGURIDAD_Y_PRIVACIDAD.md` — modelo de amenazas, mapa de datos y riesgos residuales.
+- `docs/runbooks/` — `deploy`, `rollback`, `backup-restore`, `incident-response`,
+  `key-rotation`, `worker-down`, `disk-full`, `database-unavailable`.
+- `docs/ARQUITECTURA.md` — **ADR-010**.

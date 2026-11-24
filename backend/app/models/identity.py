@@ -25,7 +25,9 @@ user_roles = Table(
     "user_roles",
     Base.metadata,
     Column("user_id", Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_name", String(30), ForeignKey("roles.name", ondelete="RESTRICT"), primary_key=True),
+    Column(
+        "role_name", String(30), ForeignKey("roles.name", ondelete="RESTRICT"), primary_key=True
+    ),
 )
 
 

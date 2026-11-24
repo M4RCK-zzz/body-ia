@@ -26,7 +26,9 @@ METHOD_LABELS: dict[MeasurementMethod, str] = {
 
 _DEFAULT_SPECS = (
     MetricSpec(MeasurementType.WEIGHT, "Peso", MeasurementUnit.KG, Decimal("2"), Decimal("500")),
-    MetricSpec(MeasurementType.HEIGHT, "Estatura", MeasurementUnit.CM, Decimal("30"), Decimal("272")),
+    MetricSpec(
+        MeasurementType.HEIGHT, "Estatura", MeasurementUnit.CM, Decimal("30"), Decimal("272")
+    ),
     MetricSpec(MeasurementType.WAIST, "Cintura", MeasurementUnit.CM, Decimal("20"), Decimal("300")),
     MetricSpec(MeasurementType.HIP, "Cadera", MeasurementUnit.CM, Decimal("20"), Decimal("300")),
     MetricSpec(MeasurementType.CHEST, "Pecho", MeasurementUnit.CM, Decimal("20"), Decimal("300")),

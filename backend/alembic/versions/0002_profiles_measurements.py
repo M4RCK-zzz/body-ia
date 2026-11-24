@@ -4,6 +4,7 @@ Revision ID: 0002
 Revises: 0001
 """
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0002"
@@ -17,8 +18,12 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("display_code", sa.String(40), nullable=False),
         sa.Column("status", sa.String(16), server_default="active", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("display_code"),
@@ -36,7 +41,9 @@ def upgrade() -> None:
         sa.Column("method", sa.String(32), nullable=False),
         sa.Column("created_by", sa.String(120), nullable=False),
         sa.Column("notes", sa.String(500), nullable=True),
-        sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("supersedes_id", sa.Uuid(), nullable=True),
         sa.Column("correction_reason", sa.String(300), nullable=True),
         sa.PrimaryKeyConstraint("id"),

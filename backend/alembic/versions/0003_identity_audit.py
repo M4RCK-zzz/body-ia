@@ -7,8 +7,9 @@ Revises: 0002
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "0003"
 down_revision = "0002"
@@ -27,7 +28,10 @@ def upgrade() -> None:
         [
             {
                 "name": "admin",
-                "description": "Administra cuentas y roles. No accede a expedientes sin acceso explícito.",
+                "description": (
+                    "Administra cuentas y roles. "
+                    "No accede a expedientes sin acceso explícito."
+                ),
             },
             {
                 "name": "professional",

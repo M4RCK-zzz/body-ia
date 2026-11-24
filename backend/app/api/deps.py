@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import timedelta
 from decimal import Decimal
 from functools import lru_cache
@@ -29,6 +31,10 @@ from app.repositories.sqlalchemy_simulation_repository import (
     SqlAlchemySimulationRepository,
 )
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from app.repositories.worker_heartbeat_repository import (
+    SqlAlchemyWorkerHeartbeatRepository,
+    WorkerHeartbeatRepository,
+)
 from app.services.access_guard import AccessGuard
 from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditRecorder
@@ -50,11 +56,21 @@ def get_health_repository(db: Session = Depends(get_db)) -> HealthRepository:
     return SQLAlchemyHealthRepository(db)
 
 
+def get_storage() -> StorageBackend:
+    return LocalStorageBackend(get_settings().upload_dir)
+
+
+def get_worker_heartbeat_repository(db: Session = Depends(get_db)) -> WorkerHeartbeatRepository:
+    return SqlAlchemyWorkerHeartbeatRepository(db)
+
+
 def get_health_service(
     repository: HealthRepository = Depends(get_health_repository),
     settings: Settings = Depends(get_settings),
+    storage: StorageBackend = Depends(get_storage),
+    heartbeats: WorkerHeartbeatRepository = Depends(get_worker_heartbeat_repository),
 ) -> HealthService:
-    return HealthService(repository, settings)
+    return HealthService(repository, settings, storage=storage, heartbeats=heartbeats)
 
 
 @lru_cache
@@ -158,10 +174,6 @@ def get_user_admin_service(db: Annotated[Session, Depends(get_db)]) -> UserAdmin
         audit=AuditRecorder(audit_repository),
         tx=SessionTransaction(db),
     )
-
-def get_storage() -> StorageBackend:
-    return LocalStorageBackend(get_settings().upload_dir)
-
 
 def get_media_service(
     db: Session = Depends(get_db),

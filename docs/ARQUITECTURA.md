@@ -428,3 +428,122 @@ en ese marco sin contaminar ni un solo valor observado.
   `/simulations/:profileId` y `/simulations/:profileId/:simulationId`; botón "Simulador" en la
   ficha del expediente; comparador base vs escenario con aviso permanente.
 - El visor 3D no cambia: sigue sin superponer datos personales y no consume simulaciones.
+
+## ADR-010 · Producción, despliegue endurecido y operación (Fase 9)
+
+**Estado:** Aceptada (Fase 9) — última fase del proyecto
+
+### Contexto
+
+Las fases 1–8 construyeron producto: identidad, expedientes, mediciones inmutables, captura
+segura, pose, visor 3D, analítica con reportes y simulación aislada. Todo estaba verificado
+con `pytest` y `npm run build`, pero **nada estaba listo para operarse**: no había imagen de
+la API ni del frontend, `ENVIRONMENT` solo se leía en `/api/health`, CORS aceptaba cualquier
+método y cabecera, no existía rate limiting, el `X-Request-ID` se generaba y se perdía, y no
+había ni backup ni retención efectiva. La Fase 9 no añade producto: hace que lo construido se
+pueda desplegar, observar y recuperar.
+
+### Decisiones
+
+1. **Nginx en el borde sirviendo SPA y `/api` bajo el mismo origen (D1, D9).** El navegador
+   nunca cruza orígenes, `connect-src 'self'` es viable en la CSP y CORS pasa a ser defensa en
+   profundidad en lugar de la única barrera. El frontend usa URLs relativas cuando
+   `VITE_API_URL=""`; se distingue **vacío** de **sin definir** (con `""` se seguía cayendo en
+   `127.0.0.1:8000`, un fallo real detectado y corregido).
+2. **Dos imágenes (D2).** `api` (sin GL) para API, reportes, simulación y retención;
+   `worker-pose` con `libgl1`/`libglib2.0-0` solo para MediaPipe. Una imagen pequeña es una
+   superficie de ataque pequeña. Ambas multi-stage, usuario sin privilegios (uid 10001) y
+   `HEALTHCHECK`.
+3. **Migraciones en un job one-shot (D3).** El servicio `migrate` corre `alembic upgrade head`
+   y la API depende de `service_completed_successfully`. Nunca en el `CMD`: con varias réplicas
+   sería una carrera. El validador de composición falla si alguien lo cambia.
+4. **Producción falla al arrancar, no avisa por log (D4).** `Settings._production_guards`
+   rechaza `DEBUG=true`, CORS `*` o `http://`, `ENABLE_API_DOCS=true` y documentación pública.
+   Un despliegue mal configurado se cae en el arranque, cuando aún no hay usuarios.
+5. **Secretos fuera del repo, con plantilla sin secretos.** `.env.prod` está en `.gitignore`;
+   `.env.prod.example` documenta cada variable con valores `CAMBIA-...`. `.dockerignore` impide
+   que un `.env` entre en una imagen. La rotación está en `docs/runbooks/key-rotation.md`.
+6. **Rate limiting propio, sin Redis (D5, D6).** `SlidingWindowLimiter` en memoria, claves
+   hasheadas (nunca IP ni email en claro), reglas por endpoint (login 5/min y 20/h por email,
+   subidas 60/h, descargas 120/h, techo de 600/min) y `limit_req` en Nginx como segunda
+   barrera. `/api/health*` y la documentación **nunca** se limitan. Limitación aceptada: con N
+   réplicas el límite efectivo es N×.
+7. **Sesión en `sessionStorage` con CSP estricta (D7).** Se mantiene el contrato de bearer
+   token (sin CSRF por diseño) y se compensa con CSP sin `unsafe-inline` ni `unsafe-eval` en
+   script, `frame-ancestors 'none'` y vida de sesión atada a la pestaña. El riesgo residual
+   (XSS en un token accesible) está declarado en `SEGURIDAD_Y_PRIVACIDAD.md`.
+8. **CSP compatible con lo que las fases 2–8 cargan.** `script-src 'self' 'wasm-unsafe-eval'`
+   porque el decodificador **Draco WASM** del visor 3D necesita compilar WebAssembly;
+   `worker-src 'self' blob:` para sus workers; `img-src 'self' blob: data:` para miniaturas de
+   captura; `style-src 'self' 'unsafe-inline'` por los estilos inline de React/R3F. La política
+   es idéntica en FastAPI y Nginx y hay tests que impiden relajarla por accidente.
+9. **Trazabilidad de petición de extremo a extremo.** El `request_id` vive en un `ContextVar`,
+   entra en el log JSON, se devuelve en `X-Request-ID` (también en los 500 que salen por
+   `ServerErrorMiddleware`) y se guarda en `audit_events.detail`, sin migración porque `detail`
+   ya es `jsonb`. Nginx propaga el del cliente o genera uno.
+10. **Readiness real, no solo "la BD responde".** `/health/live` no toca la BD; `/health/ready`
+    comprueba base, **escritura real en el storage** (volumen de solo lectura o disco lleno son
+    fallos que dejan la app viva pero incapaz de guardar capturas) y que la revisión de Alembic
+    es la cabeza; devuelve 503 con el componente que falla.
+11. **Latido de workers en BD (D10).** Migración `0009_worker_heartbeats` con trigger que
+    impide retroceder en el tiempo. Cada pasada deja constancia; `/health/workers` compara con
+    `WORKER_STALE_SECONDS`. Sin latidos, un worker muerto era invisible hasta que la cola
+    crecía. El latido **nunca** puede tumbar al worker: si falla, se registra y se continúa.
+12. **Backup de dos piezas con manifiesto y restauración obligatoria (D11).** `pg_dump -Fc` +
+    `tar` del storage privado (los binarios de reportes **no** están en PostgreSQL) +
+    `manifest.json` con SHA-256 y conteos por tabla. Scripts `backup.ps1`/`restore.ps1` y sus
+    equivalentes `.sh`. El restore verifica checksums, crea una base nueva, compara conteos y
+    solo conmuta si cuadra. RPO 24 h / RTO 2 h; el ensayo de restauración forma parte del cierre.
+13. **Retención efectiva y conservadora (D14).** Hasta la Fase 8 `MEDIA_RETENTION_DAYS` solo se
+    guardaba en `retention_until`: nadie lo aplicaba. El worker `retention` purga con
+    **`DRY_RUN=true` por defecto**, audita cada borrado (`*.purged`) y no tiene repositorios de
+    `measurements`, `pose_analyses` ni `audit_events`: no puede tocarlos ni por error.
+14. **`ruff check .` = 0 avisos (D13).** Se arreglaron los 21 pendientes: 6 `I001` autofix en
+    migraciones, 10 `E501`, un `B008` resuelto con `Annotated[UploadFile, File(...)]`. Las
+    migraciones ya aplicadas solo se tocaron en formato, y CI las valida con ida y vuelta
+    (`upgrade head` → `downgrade base` → `upgrade head` → `alembic check`).
+15. **Un único lockfile: npm (D12).** Se eliminaron `pnpm-lock.yaml` y `pnpm-workspace.yaml`.
+    Dos lockfiles significan dos árboles de dependencias posibles y un build no reproducible;
+    npm es lo que usa la verificación local y la imagen.
+16. **CI sin despliegue automático (D15).** Tres jobs: backend (ruff, migraciones reales contra
+    PostgreSQL 16 de servicio, pytest), frontend (`npm ci`, lint, build con `VITE_API_URL=""`) y
+    composición (validador de Docker Compose). El despliegue sigue siendo manual y documentado:
+    automatizarlo sin entorno de staging real sería un riesgo, no una mejora.
+17. **Validación de la composición sin Docker.** `backend/scripts/validate_compose.py`
+    reproduce el merge y la interpolación de `docker compose config` y comprueba invariantes
+    (base no publicada, `migrate` one-shot y esperado por la API, `ENABLE_API_DOCS=false`,
+    healthchecks en todos los servicios, CSP con WASM permitido y sin `unsafe-eval`). Se puede
+    ejecutar en cualquier máquina y corre en CI.
+
+### Compromisos conocidos aceptados
+
+- Rate limit en memoria: N réplicas ⇒ límite N×. Nginx cubre el borde.
+- Sin WAF, sin 2FA, sin revocación individual de tokens (la rotación de `JWT_SECRET` es la
+  revocación global).
+- Sin cifrado de aplicación en reposo: se delega en el cifrado del volumen/almacenamiento.
+- Sin métricas Prometheus ni tracing distribuido: logs JSON con `request_id` y healthchecks.
+- El TLS autofirmado (`ALLOW_SELFSIGNED=true`) es para probar el stack: no sirve en producción.
+- Los backups viven fuera del servidor solo si el operador lo configura así; el script no
+  replica a almacenamiento remoto.
+
+### Consecuencias
+
+- **Nuevos directorios y ficheros:** `docker/` (`backend.Dockerfile`, `worker-pose.Dockerfile`,
+  `frontend.Dockerfile`, `nginx/`), `docker-compose.prod.yml`, `.env.prod.example`,
+  `.dockerignore`, `.github/workflows/ci.yml`, `docs/runbooks/` (8 runbooks).
+- **Backend:** `app/core/rate_limit.py`, `rate_limit_middleware.py`, `security_headers.py`,
+  `logging.py` (JSON + `ContextVar`), `app/workers/heartbeat.py`, `app/workers/retention_worker.py`,
+  `app/models/worker_heartbeat.py`, `app/repositories/worker_heartbeat_repository.py`,
+  `app/scripts` de operación (`backup.ps1`/`.sh`, `restore.ps1`/`.sh`, `validate_compose.py`).
+- **Migración nueva:** `0009_worker_heartbeats` (tabla + índice + trigger monotónico).
+- **Endpoints nuevos:** `GET /api/health/live`, `/health/ready`, `/health/workers`.
+- **Config nueva:** `DOMAIN`, `ENABLE_API_DOCS`, `SECURITY_HEADERS`, `HSTS_MAX_AGE`,
+  `TRUSTED_PROXIES`, `RATE_LIMIT_*` (7), `LOG_JSON`, `WORKER_STALE_SECONDS`,
+  `REPORT_RETENTION_DAYS`, `SIMULATION_RETENTION_DAYS`, `RETENTION_DRY_RUN`,
+  `RETENTION_POLL_SECONDS`.
+- **Acciones de auditoría nuevas:** `media.purged`, `report.purged`, `simulation.purged`, y
+  `request_id` añadido al `detail` de todos los eventos.
+- **Frontend:** un solo lockfile (npm) y resolución correcta de `VITE_API_URL` vacío.
+- **Documentación de cierre:** `docs/QA_CHECKLIST.md` (60 ítems con evidencia),
+  `docs/SEGURIDAD_Y_PRIVACIDAD.md` (modelo de amenazas, mapa de datos, riesgos residuales),
+  8 runbooks y este ADR. El proyecto queda cerrado en sus 9 fases.

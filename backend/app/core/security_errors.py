@@ -1,4 +1,7 @@
-"""Errores de identidad (401), permisos (403) y consentimiento (422) con formato {"error": {...}}."""
+"""Errores de identidad (401), permisos (403) y consentimiento (422).
+
+Todos con el mismo formato de cuerpo: `{"error": {"code": ..., "message": ...}}`.
+"""
 
 from __future__ import annotations
 

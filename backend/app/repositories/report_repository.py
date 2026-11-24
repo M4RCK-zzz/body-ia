@@ -51,3 +51,7 @@ class ReportRepository(ABC):
     @abstractmethod
     def mark_stale_failed(self, stale_before: datetime, *, now: datetime, reason: str) -> int:
         """Marca failed los processing con started_at <= stale_before. Devuelve el conteo."""
+
+    @abstractmethod
+    def expired_for_retention(self, cutoff: datetime) -> list[Report]:
+        """Reportes generados/fallidos con `completed_at < cutoff` (Fase 9)."""

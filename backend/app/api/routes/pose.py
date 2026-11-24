@@ -25,7 +25,9 @@ def _read(analysis) -> PoseAnalysisRead:
         raw = (analysis.landmarks_json or {}).get("landmarks")
         if raw:
             data.landmarks = [PoseLandmark.model_validate(lm) for lm in raw]
-        data.quality_flags = dict(analysis.quality_flags_json) if analysis.quality_flags_json else None
+        data.quality_flags = (
+            dict(analysis.quality_flags_json) if analysis.quality_flags_json else None
+        )
     else:
         data.landmarks = None
         data.quality_flags = None

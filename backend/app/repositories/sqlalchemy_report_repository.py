@@ -121,3 +121,14 @@ class SqlAlchemyReportRepository(ReportRepository):
                 )
             self._session.flush()
         return len(rows)
+
+    def expired_for_retention(self, cutoff: datetime) -> list[Report]:
+        rows = self._session.scalars(
+            select(Report).where(
+                Report.status.in_([ReportStatus.GENERATED.value, ReportStatus.FAILED.value]),
+                Report.completed_at.isnot(None),
+                Report.completed_at < cutoff,
+                Report.storage_key.isnot(None),
+            )
+        ).all()
+        return list(rows)
