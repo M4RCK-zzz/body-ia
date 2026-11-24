@@ -139,5 +139,12 @@ jobs:
           PY
           python backend/scripts/validate_compose.py --env .env.prod
 
-      - name: Validar sintaxis de Nginx (si hay Docker)
-        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /dev/null
+      # `config` valida además la sintaxis de Compose (y de sus variables). El
+      # `--env-file` es obligatorio: sin él Compose interpola desde `.env` (raíz),
+      # que no existe en el repo, y `${POSTGRES_PASSWORD:?...}` aborta.
+      - name: Validar sintaxis de Compose (docker compose config)
+        run: |
+          docker compose --env-file .env.prod \
+            -f docker-compose.yml -f docker-compose.prod.yml config > /dev/null
+          docker compose --env-file .env.prod \
+            -f docker-compose.yml -f docker-compose.prod.yml config --services
