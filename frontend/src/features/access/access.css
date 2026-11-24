@@ -1,4 +1,5 @@
-﻿.access-panel {
+/* Panel de accesos por expediente (tema oscuro AA) */
+.access-panel {
   display: grid;
   gap: 1rem;
 }
@@ -14,32 +15,115 @@
   display: grid;
   gap: 0.25rem;
   font-size: 0.9rem;
+  color: var(--text-2, #cbd5e1);
 }
 
 .access-panel table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.875rem;
 }
 
-.access-panel th,
+.access-panel th {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border, #1b3a66);
+  color: var(--text-3, #94a3b8);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .access-panel td {
   text-align: left;
   padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid #e2e2e2;
+  border-bottom: 1px solid var(--border, #1b3a66);
+  color: var(--text, #e6f0ff);
 }
 
 .access-panel__error {
-  color: #b42318;
+  color: var(--error, #f87171);
 }
 
+/* Insignias de acceso: fondo translúcido del color del nivel + texto claro.
+   (Antes eran pastillas claras con texto claro: 1.02:1, ilegible.) */
 .access-badge {
   display: inline-block;
   padding: 0.1rem 0.6rem;
   border-radius: 999px;
-  font-size: 0.8rem;
-  background: #eef2f7;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid;
+  color: var(--text-2, #cbd5e1);
+  background: var(--surface-2, #0f2347);
+  border-color: var(--border-strong, #2a4d7d);
 }
 
-.access-badge--owner { background: #dbeafe; }
-.access-badge--editor { background: #dcfce7; }
-.access-badge--viewer { background: #f1f5f9; }
+.access-badge--owner {
+  color: var(--cyan-bright, #67e8f9);
+  background: rgba(34, 211, 238, 0.14);
+  border-color: rgba(34, 211, 238, 0.6);
+}
+
+.access-badge--editor {
+  color: var(--ok, #34d399);
+  background: var(--ok-soft, rgba(52, 211, 153, 0.12));
+  border-color: rgba(52, 211, 153, 0.6);
+}
+
+.access-badge--viewer {
+  color: var(--text-2, #cbd5e1);
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(148, 163, 184, 0.55);
+}
+
+/* Controles sin clase dentro del panel: heredan el tema oscuro y el foco cian */
+.access-panel__form input,
+.access-panel__form select {
+  background: var(--surface-inset, #081327);
+  border: 1px solid var(--border-strong, #2a4d7d);
+  color: var(--text, #e6f0ff);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font: inherit;
+  min-height: 36px;
+}
+.access-panel__form input::placeholder { color: var(--text-3, #94a3b8); opacity: 1; }
+.access-panel__form input:focus,
+.access-panel__form select:focus {
+  outline: 2px solid var(--cyan, #22d3ee);
+  outline-offset: 1px;
+  border-color: var(--cyan, #22d3ee);
+}
+.access-panel__form option {
+  background-color: var(--surface, #0b1a35);
+  color: var(--text, #e6f0ff);
+}
+.access-panel__form button {
+  background: var(--cyan, #22d3ee);
+  border: 1px solid var(--cyan-bright, #67e8f9);
+  color: var(--cyan-ink, #04101f);
+  font: inherit;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  min-height: 36px;
+}
+.access-panel__form button:hover:not(:disabled) { background: var(--cyan-bright, #67e8f9); }
+.access-panel__form button:disabled {
+  background: #16314f; border-color: var(--border-strong, #2a4d7d);
+  color: #9fb2cd; cursor: not-allowed;
+}
+.access-panel table button {
+  background: var(--surface-2, #0f2347);
+  border: 1px solid var(--border-strong, #2a4d7d);
+  color: #fecaca;
+  font: inherit;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+}
+.access-panel table button:hover { border-color: var(--error, #f87171); background: rgba(248, 113, 113, 0.14); }

@@ -26,8 +26,8 @@ interface DotProps {
 function PointDot({ cx, cy, payload }: DotProps) {
   if (cx === undefined || cy === undefined) return null;
   return (
-    <circle cx={cx} cy={cy} r={4.5} fill={payload?.corrected ? "#8b5cf6" : "#22d3ee"}
-      stroke="#0b1220" strokeWidth={1.5} />
+    <circle cx={cx} cy={cy} r={4.5} fill={payload?.corrected ? "#a78bfa" : "#22d3ee"}
+      stroke="#081327" strokeWidth={1.5} />
   );
 }
 
@@ -78,9 +78,9 @@ export function MetricChart({ series, spec, catalog }: Props) {
           <LineChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
             <CartesianGrid stroke="#1f2f52" strokeDasharray="3 3" />
             <XAxis dataKey="t" type="number" scale="time" domain={["dataMin", "dataMax"]}
-              tickFormatter={(t: number) => formatDate(t)} stroke="#8fa3c4"
+              tickFormatter={(t: number) => formatDate(t)} stroke="#94a3b8"
               padding={{ left: 16, right: 16 }} />
-            <YAxis stroke="#8fa3c4" width={56} unit={` ${spec.unit}`}
+            <YAxis stroke="#94a3b8" width={56} unit={` ${spec.unit}`}
               domain={[(min: number) => Math.floor(min - 1), (max: number) => Math.ceil(max + 1)]} />
             <Tooltip content={<ChartTooltip spec={spec} catalog={catalog} />} />
             <Line type="monotone" dataKey="value" stroke="#22d3ee" strokeWidth={2}
@@ -90,7 +90,7 @@ export function MetricChart({ series, spec, catalog }: Props) {
       </div>
       <figcaption className="bv-legend">
         <span><i style={{ background: "#22d3ee" }} />Medición original</span>
-        <span><i style={{ background: "#8b5cf6" }} />Valor corregido (versión vigente)</span>
+        <span><i style={{ background: "#a78bfa" }} />Valor corregido (versión vigente)</span>
       </figcaption>
     </figure>
   );

@@ -101,7 +101,7 @@ export function PoseAnalysisDetailPage() {
           <dt>Completado</dt><dd>{formatTimestamp(a.completed_at)}</dd>
           <dt>Duración</dt><dd>{formatDurationMs(a.duration_ms)}</dd>
           <dt>Intentos</dt><dd>{a.attempt_count}</dd>
-          {a.error_message ? (<><dt>Error</dt><dd style={{ color: "#fca5a5" }}>{a.error_message}</dd></>) : null}
+          {a.error_message ? (<><dt>Error</dt><dd className="pose-detail__error">{a.error_message}</dd></>) : null}
         </dl>
       </section>
 

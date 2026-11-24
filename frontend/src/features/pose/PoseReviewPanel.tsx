@@ -35,7 +35,7 @@ function AnalysisRow({ analysis }: { analysis: PoseAnalysis }) {
           </p>
         ) : null}
         {analysis.error_message ? (
-          <p className="pose-list__meta" style={{ color: "#fca5a5" }}>{analysis.error_message}</p>
+          <p className="pose-list__meta pose-list__error">{analysis.error_message}</p>
         ) : null}
       </div>
       <div className="pose-list__actions">

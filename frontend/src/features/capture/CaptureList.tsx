@@ -88,7 +88,7 @@ function PoseCardSection({ asset, readOnly }: { asset: MediaAsset; readOnly: boo
           {enqueue.isPending ? "Encolando…" : "Analizar pose"}
         </button>
       )}
-      {errorMsg ? <span className="bv-muted" style={{ color: "#fca5a5" }}>{errorMsg}</span> : null}
+      {errorMsg ? <span className="bv-muted bv-inline-error">{errorMsg}</span> : null}
     </div>
   );
 }

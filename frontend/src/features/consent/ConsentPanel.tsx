@@ -76,7 +76,7 @@ function ConsentItem({ profileId, status, document, isOwner, isActive }: ItemPro
             <p key={i}>{text}</p>
           ))}
           <p className="bv-muted">Versión del texto: {document.version}</p>
-          <label style={{ display: "flex", gap: "0.5rem", margin: "0.75rem 0" }}>
+          <label className="bv-check">
             <input
               type="checkbox"
               checked={agreed}

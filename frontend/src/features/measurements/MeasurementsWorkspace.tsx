@@ -76,8 +76,7 @@ export function MeasurementsWorkspace({ profileId, catalog, readOnly, readOnlyRe
       <section className="bv-panel">
         <h2>Registros de {spec.label.toLowerCase()}</h2>
         <label
-          className="bv-muted"
-          style={{ display: "inline-flex", gap: "0.4rem", marginBottom: "0.75rem" }}
+          className="bv-muted bv-check bv-check--inline"
         >
           <input
             type="checkbox"

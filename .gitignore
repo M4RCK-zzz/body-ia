@@ -36,3 +36,6 @@ Thumbs.db
 !.vscode/extensions.json
 # Empaquetado local
 *.egg-info/
+
+# Galería local de auditoría visual (no se versiona)
+.uipreview/
