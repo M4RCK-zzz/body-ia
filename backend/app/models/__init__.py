@@ -7,6 +7,7 @@ from app.models.media import MediaAsset
 from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
 from app.models.report import Report
+from app.models.simulation import Simulation, SimulationBaseline
 
 __all__ = [
     "AuditEvent",
@@ -19,6 +20,8 @@ __all__ = [
     "ProfileAccess",
     "Report",
     "Role",
+    "Simulation",
+    "SimulationBaseline",
     "User",
     "user_roles",
 ]

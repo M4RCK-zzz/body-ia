@@ -324,3 +324,107 @@ diagnóstico o que un reporte mezcle mediciones observadas con estimaciones de p
   KPIs reales.
 - Fase 8 (simulador) deberá declararse `simulation` y no podrá escribir en `reports` como
   si fueran mediciones.
+
+## ADR-009 · Simulación de escenarios hipotéticos aislada (Fase 8)
+
+**Estado:** Aceptada (Fase 8)
+
+### Contexto
+
+El Documento Maestro (MOD-07, RF-012) pide un **simulador**: que el usuario pueda preguntar
+"¿y si cambiara X?" sobre su expediente. Es la funcionalidad con más riesgo de todo el
+sistema, porque el resultado se parece visualmente a una medición y puede leerse como
+predicción corporal. Las fases 2–7 dejaron mediciones inmutables y versionadas, analítica
+descriptiva sin pronóstico y separación estricta por `DataKind`. La simulación debe encajar
+en ese marco sin contaminar ni un solo valor observado.
+
+### Decisiones
+
+1. **Copia congelada de la base, nunca datos vivos.** Al crear el escenario se copian los
+   valores vigentes a `simulation_baselines` (una fila por métrica, con `measurement_id`
+   `RESTRICT`, `value_snapshot`, `unit`, `measured_at`) y se calcula `baseline_hash`
+   (SHA-256 canónico). El comparador y el worker leen **solo** esa copia. Si después se
+   corrige una medición, el escenario conserva su base y se marca `superseded_since=true`;
+   no se recalcula ni se reescribe. Esto hace el resultado reproducible y auditable años
+   después.
+2. **Aislamiento de escritura por diseño.** Las simulaciones viven en `simulations` +
+   `simulation_baselines` con `data_kind='simulation'` fijado en el dominio. El servicio no
+   tiene ninguna ruta de escritura hacia `measurements`: no las inserta, no las actualiza y
+   no las borra. Los tests verifican una huella SHA-256 del estado completo de `measurements`
+   idéntica antes y después de crear y ejecutar escenarios, y que ningún valor simulado
+   aparece en mediciones, analítica ni dashboard.
+3. **Tope del 30 % por métrica, configurable.** `SIMULATION_MAX_DELTA_PERCENT` (default 30,
+   rango válido 5–50) acota cuánto puede moverse cada métrica respecto de su valor base.
+   Superarlo es un error explícito (`SimulationError` → 422 con el mensaje "supera ±30%"), **nunca**
+   un recorte silencioso. El acotado (`clamped`) solo actúa contra el rango técnico del
+   catálogo y queda marcado en el resultado.
+4. **Tres modos y 1–4 métricas por escenario.** `delta_absolute`, `delta_percent` y
+   `target_value`. Se pueden combinar métricas en un mismo escenario (p. ej. cintura y peso)
+   para que el usuario no tenga que crear cinco escenarios casi iguales. El máximo es 4 por
+   el límite del contrato del motor.
+5. **Motor determinista y aritmético.** `bodyvision.scenario 1.0.0` trabaja con `Decimal`
+   (2 decimales, `HALF_UP`) y no usa aleatoriedad, modelos ni aprendizaje automático. Mismas
+   entradas + misma base ⇒ mismo `result_checksum`. No hay inferencia de proporciones ni
+   extrapolación entre métricas: cada parámetro afecta solo a su métrica.
+6. **La estatura es solo referencia, y no hay BMI.** `height` no es simulable (422) porque
+   deformar la estatura implicaría inventar un cuerpo. Sí entra como componente de los
+   derivados. Los derivados son divisiones explícitas: `waist_height` (cintura/estatura) y
+   `waist_hip` (cintura/cadera), cada una con sus componentes visibles en la UI. **No se
+   calcula IMC/BMI**: combinar peso y estatura produciría un número con lectura clínica, y
+   eso queda fuera del alcance no diagnóstico.
+7. **Escenario solo numérico: el visor 3D no se toca.** Una simulación no genera malla,
+   no reescala el modelo anatómico y no se superpone al visor. El plan inicial consideraba
+   deformar la malla proporcionalmente; se descartó (D3/D4) porque una malla deformada
+   finge una medición visual que el sistema no ha observado y rompe la separación
+   observado / estimado / hipotético.
+8. **Worker asíncrono sobre la propia tabla.** `simulations` es la cola:
+   `draft → queued → completed | failed`, más `archived`. El worker
+   (`app/workers/simulation_worker.py`, `scripts/run-simulation-worker.ps1`) reserva con
+   `SELECT ... FOR UPDATE SKIP LOCKED`, escribe `started_at`, calcula y hace commit por
+   iteración. `run_once()` es idempotente: devuelve `False` si no hay nada o si el escenario
+   ya se procesó. Un escenario manipulado en su `value_snapshot` falla con mensaje de
+   integridad (`simulation.failed`) y una cola más vieja que
+   `SIMULATION_STALE_PROCESSING_SECONDS` pasa a `failed` con `queue_stale`.
+9. **Borradores permitidos, sin ejecución implícita.** `POST` acepta `run_now=false` para
+   dejar el escenario en `draft` y revisarlo antes; `POST /{id}/run` lo encola. También se
+   puede crear y ejecutar en un mismo paso. Un borrador no calcula nada.
+10. **Archivar es lógico y conserva la traza.** `POST /{id}/archive` pasa a `archived` sin
+    borrar filas ni tocar `completed_at`; los triggers de la migración `0008` impiden `DELETE`
+    y cualquier mutación de los campos congelados (`parameters_json`, `baseline_hash`,
+    `result_json`, `result_checksum`). Archivar el escenario no archiva sus mediciones.
+11. **Acceso y auditoría.** Se exige consentimiento vigente para crear y `viewer+` para leer;
+    archivar requiere `OWNER` (un no-autor recibe `insufficient_access`). El rol `admin` no
+    obtiene acceso implícito. Se audita `simulation.created`, `simulation.queued`,
+    `simulation.completed`, `simulation.failed`, `simulation.archived` y `simulation.viewed`.
+12. **Advertencia permanente de escenario hipotético.** El texto vive en el dominio
+    (`SIMULATION_BANNER`/`SIMULATION_DISCLAIMER`) y se muestra en todas las superficies: lista,
+    formulario, comparador y detalle, además del resultado del endpoint `comparison`. La UI
+    usa borde discontinuo y la etiqueta `SIMULATION` para que nunca se confunda con una
+    medición observada. No es descartable ni configurable desde el cliente.
+13. **Sin reportes PDF de simulación en esta fase.** Los reportes de la Fase 7 rechazan
+    `kind=simulation_pdf` (422): un PDF exportable de un escenario hipotético es exactamente
+    el artefacto que más fácilmente se saca de contexto. Si se añade en Fase 9, llevará el
+    aviso en cabecera, pie y marca de agua.
+
+### Compromisos conocidos aceptados
+
+- Sin reintentos automáticos: un escenario `failed` exige crear o relanzar otro.
+- Sin edición de parámetros: un escenario calculado es inmutable; para cambiarlo se crea otro.
+- Máximo 20 escenarios activos (no archivados) por expediente; al llegar al tope se pide
+  archivar antes de seguir (`SIMULATION_MAX_ACTIVE_PER_PROFILE`).
+- El worker se levanta aparte; sin él los escenarios quedan `queued` (la UI se refresca sola).
+- La simulación no se exporta (ni CSV ni PDF) y no se agrega a la analítica ni al dashboard.
+
+### Consecuencias
+
+- Tablas nuevas `simulations` y `simulation_baselines` (migración `0008_simulations`), con FK
+  `RESTRICT` a `measurements`, CHECKs de estado/modo y triggers de protección.
+- Endpoints nuevos: `GET /api/simulations/limits`, `POST|GET /api/profiles/{id}/simulations`,
+  `GET /api/simulations`, `GET /api/simulations/{id}`, `GET /api/simulations/{id}/comparison`,
+  `POST /api/simulations/{id}/run`, `POST /api/simulations/{id}/archive`.
+- Config nueva: `SIMULATION_MAX_DELTA_PERCENT`, `SIMULATION_POLL_SECONDS`,
+  `SIMULATION_STALE_PROCESSING_SECONDS`, `SIMULATION_MAX_ACTIVE_PER_PROFILE`.
+- Frontend: ítem **Simulador** activo en `SideNav`; rutas `/simulations`,
+  `/simulations/:profileId` y `/simulations/:profileId/:simulationId`; botón "Simulador" en la
+  ficha del expediente; comparador base vs escenario con aviso permanente.
+- El visor 3D no cambia: sigue sin superponer datos personales y no consume simulaciones.

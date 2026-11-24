@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     report_poll_seconds: float = Field(default=5.0, ge=0.5, le=60.0)
     report_stale_processing_seconds: int = Field(default=1800, ge=60, le=86400)
 
+    # --- Simulación de escenarios (Fase 8) ---
+    simulation_max_delta_percent: float = Field(default=30.0, ge=5.0, le=50.0)
+    simulation_poll_seconds: float = Field(default=5.0, ge=0.5, le=60.0)
+    simulation_stale_processing_seconds: int = Field(default=1800, ge=60, le=86400)
+    simulation_max_active_per_profile: int = Field(default=20, ge=1, le=200)
+
     # --- Identidad (Fase 3) ---
     jwt_secret: SecretStr
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"

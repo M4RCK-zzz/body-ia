@@ -232,3 +232,81 @@ Checklist manual:
 5. Solicitar un reporte de **Pose (CSV)** y comprobar que el documento dice
    `visual_estimate` y no contiene filas de mediciones.
 6. Dashboard: los tres KPIs muestran números reales y ninguna leyenda "Disponible en Fase 2".
+
+## Fase 8 - Simulador de escenarios hipotéticos
+
+El simulador responde "¿y si…?" **sin tocar nada de lo observado**. Un escenario es una
+copia congelada de las mediciones vigentes del expediente (`simulation_baselines`) más un
+puñado de parámetros; el resultado se guarda aparte, con `data_kind = simulation` y una
+huella SHA-256. **Nunca escribe ni sobrescribe `measurements`**, y no aparece en la analítica
+ni en el dashboard.
+
+- **Motor** `bodyvision.scenario 1.0.0`, determinista y aritmético (Decimal, 2 decimales).
+  Sin azar, sin modelos, sin predicción.
+- **Tope ±30 %** por métrica (`SIMULATION_MAX_DELTA_PERCENT`, configurable entre 5 y 50).
+  Superarlo es un error explícito (422), nunca un recorte silencioso.
+- **1–4 métricas** por escenario, con tres modos: cambio absoluto, cambio porcentual y valor
+  objetivo. `height` **no** es simulable: solo se usa como referencia.
+- **Derivados aritméticos** `waist_height` (cintura/estatura) y `waist_hip` (cintura/cadera),
+  con sus componentes a la vista. **No se calcula IMC/BMI** ni ningún indicador clínico.
+- **Escenario solo numérico**: el visor 3D no se deforma ni se superpone. No se genera malla.
+- **Aviso permanente** "ESCENARIO HIPOTÉTICO" en lista, formulario, comparador y detalle.
+
+### Endpoints (Fase 8)
+- `GET /api/simulations/limits` — contrato del motor: métricas simulables, modos, tope vigente,
+  `height_as_reference_only=true` y aviso.
+- `POST /api/profiles/{id}/simulations` — crea un escenario (`run_now=false` deja borrador).
+  Requiere acceso de escritura y consentimiento vigente.
+- `GET /api/profiles/{id}/simulations` — escenarios del expediente (filtro `status`).
+- `GET /api/simulations` — escenarios del usuario en expedientes con acceso vigente.
+- `GET /api/simulations/{id}` — detalle con parámetros, tiempos y hash de la base.
+- `GET /api/simulations/{id}/comparison` — base observada vs escenario, derivados, avisos y
+  checksum. Audita `simulation.viewed`.
+- `POST /api/simulations/{id}/run` — encola el cálculo (`draft` → `queued`).
+- `POST /api/simulations/{id}/archive` — archivo lógico (requiere `OWNER`).
+
+### Worker de simulación (Windows)
+```powershell
+powershell -ExecutionPolicy Bypass -File backend\scripts\run-simulation-worker.ps1
+# Un solo lote y salir:
+powershell -ExecutionPolicy Bypass -File backend\scripts\run-simulation-worker.ps1 -Once
+```
+Reserva con `FOR UPDATE SKIP LOCKED`, calcula y hace commit por iteración. Sin el worker los
+escenarios quedan en **En cola** y la UI se refresca sola.
+
+### Migración y variables
+```powershell
+cd backend
+.venv\Scripts\python.exe -m alembic upgrade head   # aplica 0008_simulations
+```
+Variables nuevas en `backend/.env`: `SIMULATION_MAX_DELTA_PERCENT=30`,
+`SIMULATION_POLL_SECONDS=5`, `SIMULATION_STALE_PROCESSING_SECONDS=1800`,
+`SIMULATION_MAX_ACTIVE_PER_PROFILE=20` (ver `.env.example`).
+
+### Frontend
+- **Simulador** activo en el menú lateral → `/simulations` (mis escenarios).
+- `/simulations/:profileId` — crear escenario y ver comparador del expediente.
+- `/simulations/:profileId/:simulationId` — detalle con traza y comparador.
+- Botón **Simulador** en la ficha del expediente.
+
+### Verificación de Fase 8
+```powershell
+cd backend
+.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\ruff.exe check .
+cd ..\frontend
+npm run lint
+npm run build
+```
+
+Checklist manual:
+1. Ficha de expediente → **Simulador**: aparece el aviso permanente y el tope de ±30 %.
+2. Crear un escenario con `waist` −4.4 cm → el estado pasa a **En cola** y luego a **Calculado**
+   al levantar el worker.
+3. Abrir el comparador: base observada `88.00` frente a escenario `83.60`, Δ −4.40 y −5.00 %.
+4. Comprobar los derivados: `waist_height` baja y `waist_hip` baja, ambos con sus componentes.
+5. Revisar `/measurements` y `/analytics` del mismo expediente: **no cambia ni un valor**.
+6. Intentar simular `height` → 422; intentar un cambio de ±40 % → 422 con el mensaje del tope.
+7. Corregir una medición usada como base → el escenario antiguo mantiene su copia y avisa
+   "base corregida después de calcularlo".
+8. Archivar un escenario con otro usuario (sin `OWNER`) → `insufficient_access`.

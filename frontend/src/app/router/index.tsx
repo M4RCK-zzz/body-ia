@@ -12,6 +12,9 @@ import { PoseAnalysisDetailPage } from "@/features/pose/PoseAnalysisDetailPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
 import { ReportDetailPage } from "@/features/reports/ReportDetailPage";
 import { AnalyticsPage } from "@/features/analytics/AnalyticsPage";
+import { SimulationsPage } from "@/features/simulations/SimulationsPage";
+import { SimulationWorkspacePage } from "@/features/simulations/SimulationWorkspacePage";
+import { SimulationDetailPage } from "@/features/simulations/SimulationDetailPage";
 import { AppShell } from "../layouts/AppShell";
 import { NotFoundPage } from "./NotFoundPage";
 import { LazyViewer } from "./LazyViewer";
@@ -37,6 +40,9 @@ export const router = createBrowserRouter([
       { path: "reports", element: <ReportsPage /> },
       { path: "reports/:reportId", element: <ReportDetailPage /> },
       { path: "analytics/:profileId", element: <AnalyticsPage /> },
+      { path: "simulations", element: <SimulationsPage /> },
+      { path: "simulations/:profileId", element: <SimulationWorkspacePage /> },
+      { path: "simulations/:profileId/:simulationId", element: <SimulationDetailPage /> },
       { path: "viewer", element: <LazyViewer /> },
       { path: "viewer/:profileId", element: <LazyViewer /> },
       { path: "*", element: <NotFoundPage /> },

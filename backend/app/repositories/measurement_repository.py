@@ -31,3 +31,8 @@ class MeasurementRepository(ABC):
     ) -> tuple[list[Measurement], int]: ...
     @abstractmethod
     def get_chain(self, measurement_id: UUID, profile_id: UUID) -> list[Measurement]: ...
+    @abstractmethod
+    def latest_current_by_metric(
+        self, profile_id: UUID, metric_types: Iterable[MeasurementType]
+    ) -> dict[str, Measurement]:
+        """Medición vigente más reciente por métrica (base de simulación, Fase 8)."""

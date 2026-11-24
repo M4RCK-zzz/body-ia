@@ -80,6 +80,30 @@ class SqlAlchemyMeasurementRepository(MeasurementRepository):
         stmt = select(Measurement).where(*conditions).order_by(*order).limit(limit).offset(offset)
         return list(self._session.scalars(stmt)), total
 
+    def latest_current_by_metric(
+        self, profile_id: UUID, metric_types: Iterable[MeasurementType]
+    ) -> dict[str, Measurement]:
+        wanted = sorted({str(getattr(m, "value", m)) for m in metric_types})
+        if not wanted:
+            return {}
+        superseded = select(Measurement.supersedes_id).where(
+            Measurement.supersedes_id.isnot(None)
+        )
+        stmt = (
+            select(Measurement)
+            .where(
+                Measurement.profile_id == profile_id,
+                Measurement.metric_type.in_(wanted),
+                Measurement.id.not_in(superseded),
+            )
+            .order_by(Measurement.metric_type, Measurement.measured_at.desc(),
+                      Measurement.recorded_at.desc())
+        )
+        latest: dict[str, Measurement] = {}
+        for row in self._session.execute(stmt).scalars():
+            latest.setdefault(row.metric_type, row)
+        return latest
+
     def get_chain(self, measurement_id: UUID, profile_id: UUID) -> list[Measurement]:
         node = self.get(measurement_id, profile_id)
         if node is None:

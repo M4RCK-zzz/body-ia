@@ -14,6 +14,7 @@ from app.api.routes import (
     pose,
     profiles,
     reports,
+    simulations,
 )
 
 api_router = APIRouter()
@@ -34,3 +35,4 @@ api_router.include_router(analytics.router)
 api_router.include_router(reports.router)
 api_router.include_router(reports.asset_router)
 api_router.include_router(dashboard.router)
+api_router.include_router(simulations.router)

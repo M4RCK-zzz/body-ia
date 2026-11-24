@@ -12,7 +12,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Captura corporal', to: '/capture' },
   { label: 'Análisis de pose', to: '/analyses' },
   { label: 'Visor 3D', to: '/viewer' },
-  { label: 'Simulador', phase: 8 },
+  { label: 'Simulador', to: '/simulations' },
   { label: 'Reportes', to: '/reports' },
   { label: 'Administración', phase: 3 },
 ]

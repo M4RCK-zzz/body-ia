@@ -49,6 +49,12 @@ class AuditAction(StrEnum):
     REPORT_DOWNLOADED = "report.downloaded"
     ANALYTICS_VIEWED = "analytics.viewed"
     DASHBOARD_VIEWED = "dashboard.viewed"
+    SIMULATION_CREATED = "simulation.created"
+    SIMULATION_QUEUED = "simulation.queued"
+    SIMULATION_COMPLETED = "simulation.completed"
+    SIMULATION_FAILED = "simulation.failed"
+    SIMULATION_ARCHIVED = "simulation.archived"
+    SIMULATION_VIEWED = "simulation.viewed"
 
 
 MIN_PASSWORD_LENGTH = 10

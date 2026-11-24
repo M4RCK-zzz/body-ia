@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated
 
@@ -24,6 +25,9 @@ from app.repositories.sqlalchemy_media_repository import SqlAlchemyMediaReposito
 from app.repositories.sqlalchemy_pose_repository import SqlAlchemyPoseRepository
 from app.repositories.sqlalchemy_profile_repository import SqlAlchemyProfileRepository
 from app.repositories.sqlalchemy_report_repository import SqlAlchemyReportRepository
+from app.repositories.sqlalchemy_simulation_repository import (
+    SqlAlchemySimulationRepository,
+)
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.services.access_guard import AccessGuard
 from app.services.analytics_service import AnalyticsService
@@ -38,6 +42,7 @@ from app.services.pose_service import PoseService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
 from app.services.report_service import ReportService
+from app.services.simulation_service import SimulationService
 from app.services.user_admin_service import UserAdminService
 
 
@@ -219,4 +224,21 @@ def get_dashboard_service(db: Session = Depends(get_db)) -> DashboardService:
         SqlAlchemyPoseRepository(db),
         _audit(db),
         SessionTransaction(db),
+    )
+
+
+def get_simulation_service(
+    db: Session = Depends(get_db), catalog: MetricCatalog = Depends(get_metric_catalog)
+) -> SimulationService:
+    settings = get_settings()
+    return SimulationService(
+        guard=get_access_guard(db),
+        simulations=SqlAlchemySimulationRepository(db),
+        measurements=SqlAlchemyMeasurementRepository(db),
+        consents=get_consent_service(db),
+        catalog=catalog,
+        audit=_audit(db),
+        tx=SessionTransaction(db),
+        max_delta_percent=Decimal(str(settings.simulation_max_delta_percent)),
+        max_active_per_profile=settings.simulation_max_active_per_profile,
     )

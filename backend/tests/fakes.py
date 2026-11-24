@@ -20,6 +20,7 @@ from app.models.media import MediaAsset
 from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
 from app.models.report import Report
+from app.models.simulation import Simulation, SimulationBaseline
 from app.repositories.access_repository import ConsentRepository, ProfileAccessRepository
 from app.repositories.analytics_repository import AnalyticsRepository
 from app.repositories.measurement_repository import MeasurementRepository
@@ -27,6 +28,7 @@ from app.repositories.media_repository import MediaRepository
 from app.repositories.pose_repository import PoseRepository
 from app.repositories.profile_repository import ProfileRepository
 from app.repositories.report_repository import ReportRepository
+from app.repositories.simulation_repository import SimulationRepository
 from app.services.access_guard import AccessGuard
 from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditRecorder
@@ -37,6 +39,7 @@ from app.services.pose_service import PoseService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
 from app.services.report_service import ReportService
+from app.services.simulation_service import SimulationService
 from tests.identity_fakes import FakeTransaction, InMemoryAuditRepository, InMemoryUserRepository
 
 __all__ = [
@@ -46,6 +49,7 @@ __all__ = [
     "InMemoryMediaRepository",
     "InMemoryPoseRepository",
     "InMemoryReportRepository",
+    "InMemorySimulationRepository",
     "Services",
     "build_services",
 ]
@@ -370,6 +374,23 @@ class InMemoryMeasurementRepository(MeasurementRepository):
         rows.sort(key=lambda m: (m.measured_at, m.recorded_at), reverse=not ascending)
         return rows[offset : offset + limit], len(rows)
 
+    def latest_current_by_metric(
+        self, profile_id: UUID, metric_types: Iterable[MeasurementType]
+    ) -> dict[str, Measurement]:
+        wanted = {str(getattr(m, "value", m)) for m in metric_types}
+        latest: dict[str, Measurement] = {}
+        rows = [
+            m
+            for m in self.items
+            if m.profile_id == profile_id
+            and m.metric_type in wanted
+            and not self.is_superseded(m.id)
+        ]
+        rows.sort(key=lambda m: (m.measured_at, m.recorded_at))
+        for row in rows:
+            latest[row.metric_type] = row
+        return latest
+
     def get_chain(self, measurement_id: UUID, profile_id: UUID) -> list[Measurement]:
         node = self.get(measurement_id, profile_id)
         if node is None:
@@ -549,6 +570,97 @@ class InMemoryAnalyticsRepository(AnalyticsRepository):
         return out
 
 
+class InMemorySimulationRepository(SimulationRepository):
+    """Cola de escenarios en memoria con la semántica de la implementación SQL."""
+
+    def __init__(self, access: InMemoryProfileAccessRepository | None = None) -> None:
+        self.items: list[Simulation] = []
+        self.baselines: list[SimulationBaseline] = []
+        self._access = access
+
+    def get(self, simulation_id: UUID) -> Simulation | None:
+        return next((s for s in self.items if s.id == simulation_id), None)
+
+    def add(self, simulation: Simulation) -> Simulation:
+        if getattr(simulation, "id", None) is None:
+            simulation.id = uuid4()
+        self.items.append(simulation)
+        return simulation
+
+    def save(self, simulation: Simulation) -> Simulation:
+        if self.get(simulation.id) is None:
+            self.items.append(simulation)
+        return simulation
+
+    def add_baseline(self, row: SimulationBaseline) -> SimulationBaseline:
+        if getattr(row, "id", None) is None:
+            row.id = uuid4()
+        self.baselines.append(row)
+        return row
+
+    def baselines_for(self, simulation_id: UUID) -> list[SimulationBaseline]:
+        rows = [b for b in self.baselines if b.simulation_id == simulation_id]
+        return sorted(rows, key=lambda b: b.metric_type)
+
+    def list_page(
+        self,
+        *,
+        profile_id: UUID,
+        status: str | None,
+        include_archived: bool,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[Simulation], int]:
+        rows = [s for s in self.items if s.profile_id == profile_id]
+        if status is not None:
+            rows = [s for s in rows if s.status == status]
+        elif not include_archived:
+            rows = [s for s in rows if s.status != "archived"]
+        rows.sort(key=lambda s: s.created_at, reverse=True)
+        return rows[offset : offset + limit], len(rows)
+
+    def list_page_for_user(
+        self, *, created_by_user_id: UUID, status: str | None, limit: int, offset: int
+    ) -> tuple[list[Simulation], int]:
+        rows = [s for s in self.items if s.created_by_user_id == created_by_user_id]
+        if status is not None:
+            rows = [s for s in rows if s.status == status]
+        if self._access is not None:
+            rows = [
+                s
+                for s in rows
+                if self._access.get_active(s.profile_id, created_by_user_id) is not None
+            ]
+        rows.sort(key=lambda s: s.created_at, reverse=True)
+        return rows[offset : offset + limit], len(rows)
+
+    def count_active_for_profile(self, profile_id: UUID) -> int:
+        return sum(
+            1
+            for s in self.items
+            if s.profile_id == profile_id and s.status in ("draft", "queued")
+        )
+
+    def claim_next(self) -> Simulation | None:
+        rows = [s for s in self.items if s.status == "queued"]
+        rows.sort(key=lambda s: (s.queued_at, s.id))
+        return rows[0] if rows else None
+
+    def mark_stale_failed(self, stale_before, *, now, reason: str) -> int:
+        count = 0
+        for simulation in self.items:
+            if (
+                simulation.status == "queued"
+                and simulation.queued_at is not None
+                and simulation.queued_at <= stale_before
+            ):
+                simulation.status = "failed"
+                simulation.error_message = reason
+                simulation.completed_at = now
+                count += 1
+        return count
+
+
 @dataclass
 class Services:
     users: InMemoryUserRepository
@@ -561,6 +673,7 @@ class Services:
     pose_repo: InMemoryPoseRepository
     reports_repo: InMemoryReportRepository
     analytics_repo: InMemoryAnalyticsRepository
+    simulations_repo: InMemorySimulationRepository
     storage: FakeStorageBackend
     audit: AuditRecorder
     tx: FakeTransaction
@@ -574,6 +687,7 @@ class Services:
     pose: PoseService
     analytics: AnalyticsService
     reports: ReportService
+    simulations: SimulationService
 
     # --- ayudas para los tests ---
     def new_user(self, name: str, role: str = "user") -> User:
@@ -618,6 +732,7 @@ def build_services(clock=utcnow) -> Services:
     storage = FakeStorageBackend()
     reports_repo = InMemoryReportRepository(access_repo)
     analytics_repo = InMemoryAnalyticsRepository(measurements_repo)
+    simulations_repo = InMemorySimulationRepository(access_repo)
     guard = AccessGuard(profiles_repo, access_repo, audit, tx)
     consent = ConsentService(guard, consents_repo, audit, tx, clock=clock)
     return Services(
@@ -631,6 +746,7 @@ def build_services(clock=utcnow) -> Services:
         pose_repo=pose_repo,
         reports_repo=reports_repo,
         analytics_repo=analytics_repo,
+        simulations_repo=simulations_repo,
         storage=storage,
         audit=audit,
         tx=tx,
@@ -675,6 +791,16 @@ def build_services(clock=utcnow) -> Services:
             guard,
             reports_repo,
             storage,
+            audit,
+            tx,
+            clock=clock,
+        ),
+        simulations=SimulationService(
+            guard,
+            simulations_repo,
+            measurements_repo,
+            consent,
+            default_catalog(),
             audit,
             tx,
             clock=clock,
