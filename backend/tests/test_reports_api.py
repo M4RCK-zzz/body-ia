@@ -244,3 +244,20 @@ class TestDashboardEndpoint:
         assert r.status_code == 200
         assert r.json()["profiles_total"] == 0
         assert r.json()["pose_by_status"] == {}
+
+
+def test_reports_expose_the_profile_code_for_context(env: ApiEnv):
+    """La lista de `/api/reports` distingue a qué expediente pertenece cada documento.
+
+    El código se lee del `parameters_json` congelado al solicitar el reporte.
+    """
+    pid = env.profile("BV-042")
+    created = env.client.post(
+        f"/api/profiles/{pid}/reports", json={"kind": "measurements_csv"}
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["profile_display_code"] == "BV-042"
+
+    listing = env.client.get("/api/reports")
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["items"][0]["profile_display_code"] == "BV-042"

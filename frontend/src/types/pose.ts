@@ -10,12 +10,20 @@ export const POSE_STATUS_LABEL: Record<PoseAnalysisStatus, string> = {
   needs_review: "Requiere revisión",
 };
 
+/**
+ * Clases de la píldora de estado.
+ *
+ * Antes `needs_review`/`failed` apuntaban a `bv-alert--warn|error`, que son
+ * bloques de aviso (`padding`, `border-radius` y borde pensados para un párrafo):
+ * dentro de un `<span class="bv-tag">` se veían como una barra estirada. Ahora
+ * usan variantes de etiqueta y la píldora mide su texto.
+ */
 export const POSE_STATUS_BADGE_CLASS: Record<PoseAnalysisStatus, string> = {
   queued: "bv-tag--status",
   processing: "bv-tag--status",
   completed: "bv-tag--observed",
-  needs_review: "bv-alert--warn",
-  failed: "bv-alert--error",
+  needs_review: "bv-tag--warn",
+  failed: "bv-tag--error",
 };
 
 export interface PoseLandmark {

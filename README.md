@@ -311,6 +311,25 @@ Checklist manual:
    "base corregida después de calcularlo".
 8. Archivar un escenario con otro usuario (sin `OWNER`) → `insufficient_access`.
 
+## Ajustes de interfaz (revisión en vivo)
+
+- **Visor 3D — tejido adiposo:** el atlas publicado trae **7 sistemas** (piel, esqueleto,
+  músculos, órganos, arterias, venas y nervios) y **no** incluye malla de grasa. Se verificó
+  `frontend/public/models/` y `manifest.json`. En lugar de generar una malla sintética (sería
+  geometría sin procedencia), el panel de capas declara la ausencia con el motivo y el
+  procedimiento para incorporarla si algún día se añade el `.glb`. La lista de ausencias vive en
+  `frontend/src/features/viewer3d/layers.ts`.
+- **Píldoras de estado:** `kind-badge`, `bv-tag` y `pose-badge` usan `width: fit-content` +
+  `align-self: flex-start`, así que no se estiran al ancho del contenedor en Dashboard
+  ("Cómo leer los datos") ni en Análisis de pose ("EN COLA").
+- **Simulador:** las métricas se muestran con su etiqueta en español (`Cintura`, `Cadera`,
+  `Peso`…) desde el catálogo (`useMeasurementCatalog`), con respaldo local en
+  `features/measurements/metricLabels.ts`; nunca la clave cruda del backend.
+- **Reportes:** cada fila muestra el `display_code` del expediente (enlazado), congelado en el
+  reporte al solicitarlo. Se expone en el contrato como `profile_display_code`.
+- **Análisis de pose:** corregida la concordancia ("Los esquemas corporales generados por IA") y
+  las píldoras `needs_review`/`failed` dejaron de usar clases de *alerta* dentro de una etiqueta.
+
 ## Administración (panel de administrador)
 
 La entrada **Administración** del menú lateral solo aparece a las cuentas con rol `admin`;

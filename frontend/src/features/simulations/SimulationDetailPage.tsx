@@ -3,6 +3,8 @@ import "@/components/ui/forms.css";
 import { DataKindBadge } from "@/components/ui/DataKindBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/features/measurements/format";
+import { useMeasurementCatalog } from "@/features/measurements/hooks/useCatalog";
+import { labelsFromCatalog, metricLabel } from "@/features/measurements/metricLabels";
 import {
   PARAMETER_MODE_LABEL,
   SIMULATION_STATUS_LABEL,
@@ -28,6 +30,8 @@ const VARIANT: Record<SimulationStatus, "ok" | "warn" | "error" | "neutral"> = {
 
 export function SimulationDetailPage() {
   const { simulationId = "" } = useParams();
+  const catalog = useMeasurementCatalog();
+  const metricLabels = labelsFromCatalog(catalog.data?.metrics);
   const simulation = useSimulation(simulationId);
   const comparison = useSimulationComparison(
     simulationId,
@@ -111,7 +115,8 @@ export function SimulationDetailPage() {
         <ul className="scenario-params">
           {s.parameters_json.metrics.map((metric) => (
             <li key={metric.metric_type}>
-              <strong>{metric.metric_type}</strong> · {PARAMETER_MODE_LABEL[metric.mode]} ·{" "}
+              <strong>{metricLabel(metric.metric_type, metricLabels)}</strong> ·{" "}
+              {PARAMETER_MODE_LABEL[metric.mode]} ·{" "}
               {metric.value}
             </li>
           ))}
@@ -139,7 +144,9 @@ export function SimulationDetailPage() {
 
       {comparison.isLoading ? <p className="bv-muted">Cargando comparador…</p> : null}
       {comparison.error ? <p className="bv-alert bv-alert--error">{comparison.error.message}</p> : null}
-      {comparison.data ? <ScenarioComparator comparison={comparison.data} /> : null}
+      {comparison.data ? (
+        <ScenarioComparator comparison={comparison.data} metricLabels={metricLabels} />
+      ) : null}
     </div>
   );
 }

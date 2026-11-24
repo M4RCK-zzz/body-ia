@@ -592,3 +592,36 @@ gestión de cuentas y roles solo era posible con `curl` o con `create-admin.ps1`
 - Backend: filtros opcionales en `UserRepository`/`AuditRepository` y sus implementaciones,
   `distinct_actions()`, `get_many()`, `resolve_actors()` y `tests/test_admin_api.py` (15 tests).
 - `ROLE_DESCRIPTIONS` se centraliza en `features/auth/roles.ts`, espejo del backend.
+
+## ADR-012 · Capas ausentes en el visor y contexto en las listas
+
+**Estado:** Aceptada (ajustes de la revisión en vivo)
+
+### Decisiones
+
+1. **Una capa anatómica sin geometría no se dibuja.** El atlas Z-Anatomy/BodyParts3D publicado
+   trae 7 sistemas y ninguno es tejido adiposo (`frontend/public/models/` y `manifest.json`
+   verificados). Se descartó generar una malla sintética: sería geometría sin procedencia, sin
+   licencia y sin correspondencia anatómica, justo lo que ADR-007 prohíbe. El panel declara la
+   ausencia, el motivo y los pasos para incorporarla (`features/viewer3d/layers.ts` es la única
+   fuente), y el mecanismo queda listo: añadir la entrada al manifiesto y el id al tipo hace que
+   el panel, la opacidad y "Aislar" funcionen sin más cambios.
+2. **Las etiquetas se comportan como etiquetas.** `kind-badge`, `bv-tag` y `pose-badge` fijan
+   `width: fit-content` + `align-self: flex-start` para no estirarse en contenedores grid/flex.
+3. **Estado ≠ alerta.** `POSE_STATUS_BADGE_CLASS` mapeaba `needs_review`/`failed` a
+   `bv-alert--warn|error`, pensadas para un párrafo; dentro de un `bv-tag` se veían como barras.
+   Se añaden `bv-tag--warn`/`bv-tag--error` y se corrigen también los estados de captura.
+4. **El catálogo manda en las etiquetas de métricas.** `features/measurements/metricLabels.ts`
+   traduce `metric_type` con el catálogo del backend cuando está cargado y, si no, con una tabla
+   en español idéntica a la del backend. Una clave desconocida se muestra tal cual: nunca se
+   oculta información.
+5. **El código de expediente viaja en el reporte.** Ya estaba congelado en
+   `parameters_json.profile_code` al solicitar; se expone como `profile_display_code` (aditivo)
+   en `ReportRead`, sin consultas extra y sin depender de renombrados posteriores.
+
+### Consecuencias
+
+- Contrato: `ReportRead.profile_display_code` (nuevo campo nullable) y un test que lo fija.
+- Frontend: `features/viewer3d/layers.ts`, `features/measurements/metricLabels.ts`, cambios de
+  CSS en `global.css`/`forms.css`/`pose.css`/`reports.css` y ajustes en Simulador y Reportes.
+- Sin cambios de reglas de dominio: ninguna medición, simulación o evento de auditoría se toca.

@@ -1,4 +1,6 @@
 import "@/components/ui/forms.css";
+import { useMeasurementCatalog } from "@/features/measurements/hooks/useCatalog";
+import { labelsFromCatalog } from "@/features/measurements/metricLabels";
 import { useMySimulations } from "./hooks/useSimulations";
 import { ScenarioBanner } from "./components/ScenarioBanner";
 import { ScenarioList } from "./components/ScenarioList";
@@ -6,6 +8,8 @@ import "./simulations.css";
 
 export function SimulationsPage() {
   const simulations = useMySimulations();
+  // Catálogo de métricas para mostrar "Cintura" en lugar de `waist` en la lista.
+  const catalog = useMeasurementCatalog();
 
   return (
     <div className="bv-page">
@@ -29,7 +33,10 @@ export function SimulationsPage() {
       {simulations.data ? (
         <section className="bv-panel">
           <h2>Mis escenarios</h2>
-          <ScenarioList simulations={simulations.data.items} />
+          <ScenarioList
+            simulations={simulations.data.items}
+            metricLabels={labelsFromCatalog(catalog.data?.metrics)}
+          />
         </section>
       ) : null}
 

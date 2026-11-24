@@ -42,8 +42,10 @@ function AssetThumbnail({ asset }: { asset: MediaAsset }) {
 function statusBadgeClass(status: MediaAsset["status"]): string {
   switch (status) {
     case "ready": return "bv-tag--observed";
-    case "rejected": return "bv-alert--error";
-    case "deleted": return "bv-alert--warn";
+    // Variantes de etiqueta, no de alerta: un `bv-alert--*` dentro de un `bv-tag`
+    // heredaba el padding de bloque y se veía como una barra.
+    case "rejected": return "bv-tag--error";
+    case "deleted": return "bv-tag--warn";
     default: return "bv-tag--status";
   }
 }

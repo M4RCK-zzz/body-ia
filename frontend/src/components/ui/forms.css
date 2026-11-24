@@ -119,9 +119,19 @@ input[type="date"], input[type="datetime-local"], input[type="time"] { color-sch
   display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; border: 1px solid;
   white-space: nowrap;
+  /* Nunca se estira al ancho del contenedor: es una etiqueta, no una barra.
+     `width: fit-content` + `align-self` cubren grid y flex (p. ej. "EN COLA"
+     dentro de una tarjeta de análisis de pose). */
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+  justify-self: start;
+  flex: 0 0 auto;
 }
 .bv-tag--observed { color: var(--ok, #34d399); border-color: var(--ok, #34d399); background: var(--ok-soft, rgba(52,211,153,0.12)); }
 .bv-tag--status { color: var(--violet, #a78bfa); border-color: var(--violet, #a78bfa); background: var(--violet-soft, rgba(167,139,250,0.14)); }
+.bv-tag--warn { color: #fde68a; border-color: rgba(251, 191, 36, 0.65); background: rgba(251, 191, 36, 0.14); }
+.bv-tag--error { color: #fecaca; border-color: rgba(248, 113, 113, 0.65); background: rgba(248, 113, 113, 0.14); }
 
 /* Avisos */
 .bv-alert { border-radius: 8px; padding: 0.7rem 0.9rem; font-size: 0.85rem; border: 1px solid; line-height: 1.5; }

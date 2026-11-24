@@ -1,4 +1,5 @@
 import type { AnatomyLayerId, AnatomyLayerManifest } from '@/types/viewer3d'
+import { ATLAS_LAYER_COUNT, MISSING_LAYERS } from './layers'
 
 export interface LayerPanelEntry {
   manifest: AnatomyLayerManifest
@@ -52,6 +53,44 @@ export function LayerPanel({
           </button>
         </div>
       </header>
+
+      {/* Capas que el atlas NO trae. Se declaran con el motivo y el procedimiento en
+          lugar de inventar geometría: una malla sintética sería
+          `approximate_reconstruction` sin procedencia, justo lo que el proyecto evita. */}
+      {MISSING_LAYERS.map((missing) => (
+        <aside
+          key={missing.id}
+          className="viewer3d__missing-layer"
+          aria-label={`Capa no disponible: ${missing.label}`}
+        >
+          <div className="viewer3d__missing-layer-head">
+            <span
+              className="viewer3d__swatch viewer3d__swatch--missing"
+              style={{ background: missing.color }}
+              aria-hidden="true"
+            />
+            <h3>{missing.label}</h3>
+            <span className="viewer3d__missing-badge">No incluida</span>
+          </div>
+          <p className="viewer3d__hint">
+            {missing.reason} El atlas publicado tiene {ATLAS_LAYER_COUNT} sistemas y ninguno es
+            tejido adiposo, así que no hay capa que activar: no se dibuja una malla aproximada
+            porque no tendría geometría con procedencia verificable.
+          </p>
+          <details className="viewer3d__missing-details">
+            <summary>Cómo añadirla si se incorpora el .glb</summary>
+            <ol>
+              {missing.howToAdd.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <p className="viewer3d__hint">
+              Mientras tanto, la superficie corporal se representa con la capa <strong>Piel</strong>
+              : es geometría real del atlas, no una estimación de grasa.
+            </p>
+          </details>
+        </aside>
+      ))}
 
       <div className="viewer3d__global-toggle">
         <label htmlFor="viewer3d-wireframe">

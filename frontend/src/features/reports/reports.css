@@ -82,6 +82,25 @@
 }
 .report-list__actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 
+/* Código del expediente en la lista: identificador, no texto corrido */
+.report-list__profile {
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  color: var(--cyan, #22d3ee);
+  text-decoration: none;
+  border: 1px solid var(--border-strong, #2a4d7d);
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: var(--surface-inset, #081327);
+  width: fit-content;
+}
+.report-list__profile:hover {
+  color: var(--cyan-bright, #67e8f9);
+  border-color: var(--cyan, #22d3ee);
+  text-decoration: none;
+}
+
 .report-detail__badges { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.4rem; }
 
 .report-detail__kv {

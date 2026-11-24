@@ -216,6 +216,23 @@
 - [ ] **9bis.11** Accesibilidad: pestañas con `role=tab`/`aria-selected`, tablas con `caption`
   y `th scope`, foco visible y ningún par texto/fondo por debajo de AA.
 
+## 9ter. Ajustes visuales de la revisión en vivo
+
+- [ ] **9ter.1** Visor 3D: el panel de capas declara "Grasa / tejido adiposo · No incluida", con
+  el motivo (el atlas trae 7 sistemas) y un desplegable "Cómo añadirla si se incorpora el .glb".
+  - `ls frontend/public/models` → 7 `.glb`; `grep -c '"id"' public/models/manifest.json` → 7.
+  - No existe ninguna malla sintética ni capa activable de grasa.
+- [ ] **9ter.2** Dashboard → "Cómo leer los datos": las cuatro píldoras
+  (MEDICIÓN OBSERVADA, ESTIMACIÓN, RECONSTRUCCIÓN APROXIMADA, ESCENARIO HIPOTÉTICO) miden su
+  texto, no el ancho de la columna.
+- [ ] **9ter.3** Análisis de pose: la píldora del estado (p. ej. "EN COLA") no se estira; los
+  estados `needs_review` y `failed` se ven como etiqueta ámbar/roja, no como bloque de alerta.
+- [ ] **9ter.4** Análisis de pose: el aviso dice "Los **esquemas corporales** generados por IA".
+- [ ] **9ter.5** Simulador → Mis escenarios: las métricas aparecen como Cintura/Cadera/Peso…,
+  nunca `waist`/`hip`/`weight`. Igual en el detalle (parámetros y comparador).
+- [ ] **9ter.6** Reportes: cada fila muestra el código del expediente (BV-…) enlazado a
+  `/expedientes/<id>`; el API devuelve `profile_display_code`.
+
 ## 10. Regresión manual por fase
 
 - [ ] **10.1 (F2)** Crear expediente, registrar medición, ver que aparece en el listado.

@@ -14,7 +14,7 @@ function AnalysisRow({ analysis }: { analysis: PoseAnalysis }) {
   return (
     <li className="pose-list__row">
       <div className="pose-list__main">
-        <span className={`bv-tag ${POSE_STATUS_BADGE_CLASS[analysis.status]}`}>
+        <span className={`bv-tag pose-list__status ${POSE_STATUS_BADGE_CLASS[analysis.status]}`}>
           {POSE_STATUS_LABEL[analysis.status].toUpperCase()}
         </span>
         <p className="pose-list__meta">
@@ -64,7 +64,7 @@ export function PoseListPage() {
         </Link>
       </header>
       <p className="bv-alert bv-alert--warn">
-        Los esquemas corporal generados por IA son <strong>estimaciones visuales</strong>, no mediciones.
+        Los esquemas corporales generados por IA son <strong>estimaciones visuales</strong>, no mediciones.
       </p>
       {profiles.isLoading ? <p className="bv-muted">Cargando expedientes…</p> : null}
       {profiles.error ? <p className="bv-alert bv-alert--error">{profiles.error.message}</p> : null}

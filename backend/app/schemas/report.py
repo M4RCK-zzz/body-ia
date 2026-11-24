@@ -156,6 +156,10 @@ class ReportRead(BaseModel):
     completed_at: datetime | None = None
     duration_ms: int | None = None
     requested_by: str | None = None
+    # Código del expediente congelado al solicitar el reporte (`parameters_json`).
+    # Se añadió para que la lista de `/reports` distinga a qué expediente pertenece
+    # cada documento; los reportes antiguos muestran el código congelado igual.
+    profile_display_code: str | None = None
     download_url: str | None = None
 
 

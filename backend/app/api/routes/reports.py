@@ -25,6 +25,11 @@ _FILENAME_LABEL = {
 def _read(report) -> ReportRead:
     data = ReportRead.model_validate(report)
     data.requested_by = report.requested_by_snapshot
+    # El código vive en `parameters_json` (congelado al solicitar): se resuelve sin
+    # tocar la base y sin depender de que el expediente se haya renombrado.
+    data.profile_display_code = str(
+        (report.parameters_json or {}).get("profile_code") or "—"
+    )
     if report.status == ReportStatus.GENERATED.value:
         data.download_url = f"/api/reports/{report.id}/content"
     return data

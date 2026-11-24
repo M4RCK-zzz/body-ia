@@ -10,6 +10,12 @@
   color: #fde68a;
   background: rgba(251, 191, 36, 0.14);
   white-space: nowrap;
+  /* Etiqueta, no barra: en header flex o en una columna del listado mide su texto. */
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+  justify-self: start;
+  flex: 0 0 auto;
 }
 
 .pose-list { display: grid; gap: 0.5rem; }
@@ -24,7 +30,9 @@
 .pose-list__row a { color: var(--cyan, #22d3ee); text-decoration: none; }
 .pose-list__row a:hover { text-decoration: underline; color: var(--cyan-bright, #67e8f9); }
 .pose-list__meta { font-size: 0.78rem; color: var(--text-3, #94a3b8); margin: 0; }
-.pose-list__main { display: grid; gap: 0.15rem; min-width: 0; flex: 1; }
+/* La columna principal ya es flex/grid: las píldoras de estado se alinean a la
+   izquierda y conservan su ancho natural. */
+.pose-list__main { display: grid; gap: 0.15rem; min-width: 0; flex: 1; justify-items: start; }
 .pose-list__actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
 /* Detalle */

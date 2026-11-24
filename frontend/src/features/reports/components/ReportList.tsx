@@ -24,6 +24,17 @@ export function ReportList({ reports, showRequester = false }: Props) {
               {REPORT_KIND_LABEL[report.kind]}
             </Link>
             <div className="report-list__meta">
+              {/* A qué expediente pertenece el documento: sin esto, la lista global
+                  era una fila de PDFs indistinguibles. */}
+              {report.profile_display_code ? (
+                <Link
+                  to={`/expedientes/${report.profile_id}`}
+                  className="report-list__profile"
+                  title="Abrir el expediente de este reporte"
+                >
+                  {report.profile_display_code}
+                </Link>
+              ) : null}
               <DataKindBadge kind={report.data_kind} />
               <span>{formatDateTime(report.created_at)}</span>
               {showRequester ? <span>por {report.requested_by}</span> : null}

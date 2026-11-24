@@ -18,6 +18,8 @@ export interface Report {
   size_bytes: number | null;
   error_message: string | null;
   requested_by: string;
+  /** Código del expediente congelado al solicitar el reporte (aditivo, Fase 9). */
+  profile_display_code: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;

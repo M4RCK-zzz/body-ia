@@ -187,6 +187,13 @@ code {
   display: inline-block; padding: 3px 10px; font-size: 0.72rem; font-weight: 700;
   letter-spacing: 0.04em; border-radius: 6px; border: 1px solid currentColor;
   white-space: nowrap; vertical-align: middle;
+  /* Dentro de un grid o flex, la píldora debe medir lo que su texto, no el 100 %
+     del contenedor (se veía estirada en "Cómo leer los datos"). */
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+  justify-self: start;
+  flex: 0 0 auto;
 }
 .kind-badge--observed { color: var(--ok); background: var(--ok-soft); }
 .kind-badge--visual_estimate { color: var(--warn); background: var(--warn-soft); }
@@ -196,7 +203,12 @@ code {
 }
 
 .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.legend li { display: grid; gap: 4px; font-size: 0.88rem; color: var(--text-2); }
+.legend li {
+  display: grid; gap: 4px; font-size: 0.88rem; color: var(--text-2);
+  /* Las píldoras del legend son ítems de grid: sin esto se estiran al ancho de
+     la columna y dejan de parecer etiquetas. */
+  justify-items: start;
+}
 .legend strong { color: var(--text-strong); }
 
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 0.9rem; }

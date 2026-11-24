@@ -68,6 +68,47 @@
 .viewer3d__panel-header h2 { margin: 0; font-size: 1rem; color: var(--cyan, #22d3ee); }
 .viewer3d__panel-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 
+/* Capa declarada como ausente: borde discontinuo, nunca un control que parezca activo */
+.viewer3d__missing-layer {
+  border: 1px dashed var(--border-strong, #2a4d7d);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  background: var(--surface-inset, #081327);
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-2, #cbd5e1);
+}
+.viewer3d__missing-layer-head { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.viewer3d__missing-layer-head h3 {
+  margin: 0; font-size: 0.88rem; color: var(--text-strong, #f1f5f9);
+}
+.viewer3d__swatch--missing {
+  background-image: repeating-linear-gradient(
+    45deg, rgba(8, 19, 39, 0.55) 0 3px, transparent 3px 6px
+  );
+  opacity: 0.85;
+}
+.viewer3d__missing-badge {
+  margin-left: auto;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--warn, #fbbf24);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.12);
+  border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+}
+.viewer3d__missing-details { display: grid; gap: 0.35rem; }
+.viewer3d__missing-details summary {
+  cursor: pointer; font-size: 0.78rem; font-weight: 600;
+  color: var(--cyan, #22d3ee); width: fit-content;
+}
+.viewer3d__missing-details summary:hover { color: var(--cyan-bright, #67e8f9); }
+.viewer3d__missing-details ol {
+  margin: 0.35rem 0 0; padding-left: 1.1rem;
+  display: grid; gap: 0.3rem; font-size: 0.76rem; color: var(--text-3, #94a3b8);
+}
+.viewer3d__missing-details .viewer3d__hint { font-size: 0.76rem; }
+
 .viewer3d__global-toggle {
   border: 1px solid var(--border-strong, #2a4d7d);
   background: var(--surface-inset, #081327);

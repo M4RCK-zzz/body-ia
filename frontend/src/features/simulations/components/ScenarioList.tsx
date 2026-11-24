@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { DataKindBadge } from "@/components/ui/DataKindBadge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/features/measurements/format";
+import { metricLabel, type MetricLabelMap } from "@/features/measurements/metricLabels";
 import {
   SIMULATION_STATUS_LABEL,
   type Simulation,
@@ -20,9 +21,11 @@ interface Props {
   simulations: Simulation[];
   onArchive?: (simulation: Simulation) => void;
   archivingId?: string | null;
+  /** Etiquetas del catálogo de métricas; si falta se usa la tabla en español. */
+  metricLabels?: MetricLabelMap;
 }
 
-export function ScenarioList({ simulations, onArchive, archivingId }: Props) {
+export function ScenarioList({ simulations, onArchive, archivingId, metricLabels }: Props) {
   if (simulations.length === 0) {
     return <p className="bv-muted">Todavía no hay escenarios en este expediente.</p>;
   }
@@ -44,9 +47,9 @@ export function ScenarioList({ simulations, onArchive, archivingId }: Props) {
               <div className="scenario-list__meta">
                 <DataKindBadge kind="simulation" />
                 <span>{formatDateTime(simulation.created_at)}</span>
-                <span>
+                <span className="scenario-list__metrics">
                   {simulation.parameters_json.metrics
-                    .map((metric) => metric.metric_type)
+                    .map((metric) => metricLabel(metric.metric_type, metricLabels))
                     .join(", ")}
                 </span>
                 <span>motor {simulation.engine_version}</span>
