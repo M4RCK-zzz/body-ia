@@ -1,0 +1,250 @@
+{
+  "schema_version": 1,
+  "kind": "approximate_reconstruction",
+  "generated_at": "2026-11-24T03:46:52.916Z",
+  "source": {
+    "repository": "https://github.com/SeemaBansal1/3d-human-body-anatomy",
+    "commit": "2891243",
+    "atlas": "Z-Anatomy",
+    "upstream": "BodyParts3D (DBCLS, CC BY-SA 2.1 JP)"
+  },
+  "licenses": {
+    "model": "CC BY-SA 4.0",
+    "upstream_model": "CC BY-SA 2.1 JP",
+    "removed": [
+      "Kidney (Lissie Cowley) CC BY-NC 4.0",
+      "Inner ear (Dundee) CC BY-NC-SA 4.0"
+    ],
+    "note": "Los componentes no comerciales (riñón) se eliminaron antes de publicar. El derivado se distribuye bajo CC BY-SA 4.0; ver ATTRIBUTION.md."
+  },
+  "units": "metros",
+  "up_axis": "Y",
+  "origin": "pies (Y=0)",
+  "draco": {
+    "required": true,
+    "decoder_path": "draco/",
+    "encoder": "gltf-transform + draco3d"
+  },
+  "totals": {
+    "meshes": 2194,
+    "triangles": 2286734,
+    "bytes": 9650656
+  },
+  "layers": [
+    {
+      "id": "skin",
+      "label": "Piel",
+      "file": "models/skin.glb",
+      "order": 7,
+      "color": "#f0c9b6",
+      "meshes": 256,
+      "triangles": 154865,
+      "bbox": {
+        "min": [
+          -0.3401,
+          -0.0004,
+          -0.1546
+        ],
+        "max": [
+          0.3401,
+          1.7433,
+          0.1456
+        ],
+        "size": [
+          0.6801,
+          1.7437,
+          0.3003
+        ]
+      },
+      "bytes": 764432,
+      "sha256": "3dc1c812961c194582617bd801798d03deade7828da624a9f5e6ab8a53c65945",
+      "pruned_nc_nodes": [],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    },
+    {
+      "id": "skeleton",
+      "label": "Esqueleto",
+      "file": "models/skeleton.glb",
+      "order": 1,
+      "color": "#e8e2d0",
+      "meshes": 271,
+      "triangles": 304452,
+      "bbox": {
+        "min": [
+          -0.3346,
+          0.0092,
+          -0.1128
+        ],
+        "max": [
+          0.3346,
+          1.7054,
+          0.1373
+        ],
+        "size": [
+          0.6692,
+          1.6962,
+          0.2501
+        ]
+      },
+      "bytes": 1265152,
+      "sha256": "3cee480391401a706d1575911a642e95578eb1b4de73f37aa31f220c07c45ec4",
+      "pruned_nc_nodes": [],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    },
+    {
+      "id": "muscles",
+      "label": "Músculos",
+      "file": "models/muscles.glb",
+      "order": 2,
+      "color": "#c2564b",
+      "meshes": 476,
+      "triangles": 447787,
+      "bbox": {
+        "min": [
+          -0.3299,
+          0.0071,
+          -0.1301
+        ],
+        "max": [
+          0.3299,
+          1.7075,
+          0.1285
+        ],
+        "size": [
+          0.6598,
+          1.7004,
+          0.2586
+        ]
+      },
+      "bytes": 1963952,
+      "sha256": "c898c281b072007c38480a086e744d6e0c5d87b7d837255072c49873e79dc9a0",
+      "pruned_nc_nodes": [],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    },
+    {
+      "id": "organs",
+      "label": "Órganos",
+      "file": "models/organs.glb",
+      "order": 3,
+      "color": "#8d6e63",
+      "meshes": 293,
+      "triangles": 387717,
+      "bbox": {
+        "min": [
+          -0.1311,
+          0.8038,
+          -0.0991
+        ],
+        "max": [
+          0.1299,
+          1.6998,
+          0.1081
+        ],
+        "size": [
+          0.2609,
+          0.896,
+          0.2072
+        ]
+      },
+      "bytes": 1580620,
+      "sha256": "70f2deb5e0a835785807a83bbf820394f902f7b2bda83c02f2bb034afb50d55d",
+      "pruned_nc_nodes": [
+        "Kidney.l.001",
+        "Kidney.r.001",
+        "Renal pelvis.l.001",
+        "Renal pelvis.r.001"
+      ],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    },
+    {
+      "id": "arteries",
+      "label": "Arterias",
+      "file": "models/arteries.glb",
+      "order": 4,
+      "color": "#d0342c",
+      "meshes": 417,
+      "triangles": 408542,
+      "bbox": {
+        "min": [
+          -0.332,
+          0.0081,
+          -0.1127
+        ],
+        "max": [
+          0.332,
+          1.7006,
+          0.1319
+        ],
+        "size": [
+          0.664,
+          1.6925,
+          0.2445
+        ]
+      },
+      "bytes": 1754068,
+      "sha256": "e4f099ec88cbb448d413c84be11144678033c454b48779538d46b39449157141",
+      "pruned_nc_nodes": [],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    },
+    {
+      "id": "veins",
+      "label": "Venas",
+      "file": "models/veins.glb",
+      "order": 5,
+      "color": "#3b6fd4",
+      "meshes": 226,
+      "triangles": 305651,
+      "bbox": {
+        "min": [
+          -0.3314,
+          0.0035,
+          -0.1041
+        ],
+        "max": [
+          0.3314,
+          1.7014,
+          0.1363
+        ],
+        "size": [
+          0.6628,
+          1.698,
+          0.2404
+        ]
+      },
+      "bytes": 1188580,
+      "sha256": "14c3974fdbac0cb60754698904a7185a63d22a4b59d99d80e305763b19b9b40e",
+      "pruned_nc_nodes": [],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    },
+    {
+      "id": "nerves",
+      "label": "Nervios",
+      "file": "models/nerves.glb",
+      "order": 6,
+      "color": "#e0b13a",
+      "meshes": 255,
+      "triangles": 277720,
+      "bbox": {
+        "min": [
+          -0.3337,
+          0.0069,
+          -0.1123
+        ],
+        "max": [
+          0.3337,
+          1.6644,
+          0.1303
+        ],
+        "size": [
+          0.6675,
+          1.6576,
+          0.2426
+        ]
+      },
+      "bytes": 1133852,
+      "sha256": "3225a154046d13cd625b5b8aac51ef342fdca835d560ff45ff63f0385192fecc",
+      "pruned_nc_nodes": [],
+      "license": "CC BY-SA 4.0 (Z-Anatomy · BodyParts3D)"
+    }
+  ]
+}

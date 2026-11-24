@@ -91,3 +91,75 @@ Si el modelo no existe, el worker **falla claro al arrancar** con mensaje explí
 ### Pruebas/observabilidad
 - Tests: `python -m pytest` (187 tests, incluye Fase 5: servicio, worker sin binario `mediapipe` y API).
 - En Windows con Postgres arriba: `alembic upgrade head` (debe crear `pose_analyses`) antes de levantar API/worker.
+
+## Fase 6 - Visor 3D anatómico (atlas genérico, CC BY-SA)
+
+El visor muestra un **atlas anatómico genérico** de referencia: **no** usa imágenes, medidas ni
+geometría del paciente y **no** diagnostica ni mide. Todo se etiqueta
+`RECONSTRUCCIÓN APROXIMADA` (`DataKind = approximate_reconstruction`) con aviso no clínico
+permanente. Ver ADR-007 en `docs/ARQUITECTURA.md`.
+
+### Qué incluye
+- **Rutas:** `/viewer` (desde el menú lateral **Visor 3D**) y `/viewer/:profileId` (botón
+  "Abrir visor 3D" en la ficha del expediente; solo aporta contexto visual, no lee datos del paciente).
+- **7 capas** con visibilidad y opacidad independientes: piel, esqueleto, músculos, órganos,
+  arterias, venas, nervios. Carga progresiva por capa (al entrar solo baja el esqueleto).
+- **Vistas** frontal / dorsal / lateral / superior + rotación automática; órbita, zoom y paneo.
+- **Wireframe real** (toggle global en el panel de capas: cambia el modo de render de los triángulos cargados).
+- **Ficha de procedencia** con licencia, autores, componentes retirados y sha256 por capa.
+- **Resiliencia:** `ErrorBoundary` por capa y recuperación de pérdida de contexto WebGL.
+- **Móvil:** DPR limitado, sin antialias/sombras y viewport ajustado.
+- Sin overlay de landmarks de Fase 5 y sin contenido médico (solo geometría y nombres de capa).
+
+### Activos 3D (`frontend/public/models/`)
+Generados desde el atlas [3d-human-body-anatomy](https://github.com/SeemaBansal1/3d-human-body-anatomy)
+(commit `2891243`, Z-Anatomy / BodyParts3D, **CC BY-SA 4.0**), con **poda previa** de los
+componentes no comerciales:
+
+| Capa | Meshes | Triángulos |
+| --- | --- | --- |
+| Piel (`skin.glb`) | 256 | 154.865 |
+| Esqueleto (`skeleton.glb`) | 271 | 304.452 |
+| Músculos (`muscles.glb`) | 476 | 447.787 |
+| Órganos (`organs.glb`, 4 nodos NC eliminados) | 293 | 387.717 |
+| Arterias (`arteries.glb`) | 417 | 408.542 |
+| Venas (`veins.glb`) | 226 | 305.651 |
+| Nervios (`nerves.glb`) | 255 | 277.720 |
+| **Total** | **2194** | **2.286.734** (~9,2 MB) |
+
+Se eliminaron los 4 meshes del **riñón** (`Kidney.l/r.001`, `Renal pelvis.l/r.001`, Lissie Cowley,
+CC BY-NC 4.0) antes de publicar; el oído interno (Dundee, CC BY-NC-SA 4.0) nunca se exportó a los GLB.
+Atribución y licencias completas: `frontend/public/models/ATTRIBUTION.md` y `manifest.json`.
+
+Regenerar los activos (opcional; los GLB ya están versionados):
+```powershell
+# desde frontend/
+git clone --depth 1 https://github.com/SeemaBansal1/3d-human-body-anatomy.git ..\.tmp\3d-human-body-anatomy
+npm run assets:anatomy -- --source ..\.tmp\3d-human-body-anatomy\web\public\models
+```
+
+### Stack
+React 18.3.1 + `@react-three/fiber` 8.18 + `@react-three/drei` 9.122 + `three` 0.186.1
+(con `overrides` de `three-mesh-bvh` a 0.9.18 para compatibilidad con three ≥ 0.17). El visor va en
+un chunk aparte (ruta `lazy`) y el decodificador Draco se sirve local desde `frontend/public/draco/`.
+
+### Verificación de Fase 6
+```powershell
+# desde frontend/
+npm install          # instala three/fiber/drei + gltf-transform (dev)
+npm run build        # tsc -b + vite build (debe terminar sin errores)
+npm run lint
+npm run dev          # http://localhost:5173 → menú "Visor 3D"
+```
+
+Checklist manual en el navegador:
+1. **Menú lateral → Visor 3D** abre `/viewer` con badge `RECONSTRUCCIÓN APROXIMADA` y aviso no clínico.
+2. Al entrar solo se descarga el **esqueleto** (pestaña Red: `skeleton.glb`); el contador muestra `1/7 capas`.
+3. Encender cada capa (piel, músculos, órganos, arterias, venas, nervios) descarga su GLB y el contador sube.
+4. **Órganos**: no aparece riñón; el resto de vísceras sí.
+5. **Wireframe real**: al activarlo, todas las capas visibles pasan a aristas; al desactivarlo vuelven a superficie.
+6. **Opacidad**: bajar la piel al 30 % deja ver músculos/esqueleto; **Aislar** deja solo esa capa.
+7. **Vistas** frontal/dorsal/lateral/superior y **rotación automática** funcionan; el arrastre orbita.
+8. **Ficha de procedencia** muestra autoría, CC BY-SA 4.0, componentes retirados y sha256 por capa.
+9. **Abrir visor 3D** desde un expediente (`/viewer/:profileId`) muestra el código del expediente y el aviso de que no se superpone con sus datos.
+10. **Móvil / ventana estrecha**: DPR limitado, sin antialias ni sombras, el panel pasa debajo del visor.

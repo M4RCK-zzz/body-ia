@@ -11,6 +11,7 @@ import { PoseListPage } from "@/features/pose/PoseListPage";
 import { PoseAnalysisDetailPage } from "@/features/pose/PoseAnalysisDetailPage";
 import { AppShell } from "../layouts/AppShell";
 import { NotFoundPage } from "./NotFoundPage";
+import { LazyViewer } from "./LazyViewer";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -30,6 +31,8 @@ export const router = createBrowserRouter([
       { path: "capture/:profileId", element: <CapturePage /> },
       { path: "analyses", element: <PoseListPage /> },
       { path: "analyses/:id", element: <PoseAnalysisDetailPage /> },
+      { path: "viewer", element: <LazyViewer /> },
+      { path: "viewer/:profileId", element: <LazyViewer /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

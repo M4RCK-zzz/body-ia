@@ -152,3 +152,86 @@ Tras la Fase 4 existen assets `ready` validados y almacenados privadamente. El D
 - El worker `app/workers/pose_worker.py` ejecuta el modelo, evalua calidad y persiste el resultado.
 - `Config` gana: `POSE_MODEL_PATH`, `POSE_POLL_SECONDS`, `POSE_STALE_PROCESSING_SECONDS`, `POSE_COMPLETE_THRESHOLD`, `POSE_REVIEW_THRESHOLD`.
 - Fase 6 (Visor 3D) evaluará/adaptará el modelo 3D `SeemaBansal1/3d-human-body-anatomy` — **no se implementa aquí**.
+
+## ADR-007 · Visor 3D anatómico genérico (Fase 6)
+
+**Estado:** Aceptada (Fase 6)
+
+### Contexto
+
+El Documento Maestro (MOD-06) pide un visor 3D del cuerpo. Se evaluó adaptar el atlas
+abierto [`SeemaBansal1/3d-human-body-anatomy`](https://github.com/SeemaBansal1/3d-human-body-anatomy)
+(commit `2891243`), construido sobre **Z-Anatomy** (CC BY-SA 4.0) y **BodyParts3D**
+(DBCLS, CC BY-SA 2.1 JP): 7 capas GLB Draco, 2198 mallas, 2,29 M triángulos, 8,9 MB,
+vértices en espacio de mundo, eje Y arriba, unidades en metros.
+
+El atlas contiene dos componentes **no comerciales**: el riñón de *Lissie Cowley*
+(CC BY-NC 4.0) y el oído interno de *Dundee* (CC BY-NC-SA 4.0). Además, el repo original
+no tiene `LICENSE` en la raíz y su `README` advierte de la restricción del riñón.
+
+### Decisiones
+
+1. **El visor muestra una reconstrucción aproximada, no al paciente.** Todo lo mostrado
+   es `DataKind = approximate_reconstruction`, con badge
+   **RECONSTRUCCIÓN APROXIMADA** y aviso no clínico permanentes. No se mezcla ni se
+   superpone con `observed`, `visual_estimate` (Fase 5) ni `simulation` (Fase 8).
+2. **Sin overlay de pose.** El atlas es genérico y no tiene correspondencia anatómica
+   verificada con los 33 landmarks de MediaPipe; superponerlos fabricaría una
+   correspondencia falsa. El visor abre desde el expediente (`/viewer/:profileId`) solo
+   como acceso contextual: **no** lee imágenes, medidas ni landmarks del expediente.
+3. **Poda de los componentes NC antes de publicar (hecho).** `frontend/scripts/build-anatomy-assets.mjs`
+   elimina los 4 nodos del riñón (`Kidney.l/r.001`, `Renal pelvis.l/r.001`) de
+   `organs.glb` y falla si no los encuentra (poda verificable, no silenciosa). El oído
+   interno de Dundee nunca se exportó a los GLB web; se documenta igualmente en la ficha
+   de procedencia. Se conservan los vasos renales y suprarrenales (BodyParts3D, BY-SA).
+4. **Cumplimiento CC BY-SA.** El derivado se publica bajo CC BY-SA 4.0 con la atribución
+   completa en `frontend/public/models/ATTRIBUTION.md` (generado por el script, con
+   sha256 por capa) y visible en la app en la **ficha de procedencia** del visor.
+5. **Sin backend en el MVP.** No hay tabla `body_models` ni endpoint: el atlas es un
+   activo estático versionado en git (`frontend/public/models/`) con
+   `manifest.json` (meshes, triángulos, bytes, sha256, bbox y licencia por capa) como
+   fuente de verdad. Si en el futuro hace falta trazabilidad por paciente o
+   gobernanza de versiones, se añadirá `body_models` + `GET /api/body-models/current`
+   y auditoría `body_model.viewed` **sin cambiar el frontend del visor**.
+6. **Sin contenido médico en el MVP.** No se portan `content/*.json` (408 estructuras
+   con descripciones de Wikipedia CC BY-SA 3.0), ni tours, ni "Dr. Buddy", ni hindi.
+   Solo geometría, capas y nombres de capa en español. Las descripciones requerirían
+   revisión de licencia y disclaimer educativo aparte.
+7. **Stack: React 18 + `@react-three/fiber` v8 + `@react-three/drei` v9 + `three` 0.186.1.**
+   Se mantiene React 18.3.1 (el resto de la app) y se fija `three` en la versión del
+   atlas original. `drei` arrastra `three-mesh-bvh@0.7.8`, marcado como incompatible con
+   three ≥ 0.17x, así que se fuerza con `overrides` a `three-mesh-bvh@0.9.18`. `@types/three`
+   se fija a `0.186.0` para que coincida con el runtime.
+8. **Streaming por capa.** Solo `skeleton` se descarga al entrar; el resto se pide al
+   encenderlo (`useGLTF.preload` + `Suspense`). El visor se carga en un chunk aparte
+   (ruta `lazy`) para no penalizar el arranque del resto de la app.
+9. **Wireframe real.** El toggle del panel de capas cambia `wireframe` en los materiales
+   de la geometría cargada; no dibuja contornos falsos ni mallas sintéticas.
+10. **Resiliencia.** `ViewerErrorBoundary` por capa (un GLB corrupto no tumba el visor) y
+    escucha de `webglcontextlost` con `event.preventDefault()` + botón "Reiniciar visor".
+11. **Móvil.** Con `(max-width: 900px), (pointer: coarse)`: DPR limitado a `[1, 1.25]`,
+    sin `antialias`, sin sombras, sin paneo por defecto y viewport más bajo.
+
+### Compromisos conocidos aceptados
+
+- 2194 draw calls por capa completa: el rendimiento depende del navegador. Se mitiga con
+  visibilidad por capa, frustum culling y sin postproceso; el merge por capa solo se hará
+  si el profiling real lo exige.
+- El decodificador Draco se sirve desde `public/draco/` (copiado de three.js, MIT):
+  +752 KB estáticos y sin dependencia de CDN.
+- El visor no identifica estructuras concretas al hacer clic (sin picking/labels en MVP).
+- No hay tests de render 3D automatizados (no hay GPU en CI): la verificación es
+  `tsc -b` + `eslint` + `vite build` y un checklist manual en navegador.
+- `ATTRIBUTION.md` y `manifest.json` se regeneran con el script; cualquier cambio manual
+  de un GLB rompe el checksum registrado.
+
+### Consecuencias
+
+- Activos nuevos versionados (~9,2 MB en `frontend/public/models/` + 752 KB de Draco):
+  no requieren Git LFS.
+- Reproducir los activos: `npm run assets:anatomy -- --source <ruta>/web/public/models`
+  (fuente clonada del atlas, no versionada).
+- Rutas nuevas: `/viewer` y `/viewer/:profileId`; ítem **Visor 3D** activo en `SideNav` y
+  botón "Abrir visor 3D" en la ficha del expediente.
+- Fase 7 (reportes) y Fase 8 (simulador) reutilizarán este visor como base; ninguna
+  deberá presentar la geometría como medición.

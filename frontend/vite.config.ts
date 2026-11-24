@@ -12,4 +12,10 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  build: {
+    // El visor 3D (three.js + drei) se carga en su propio chunk por ruta lazy
+    // (`LazyViewer`), así el resto de la app no descarga WebGL. Ese chunk pesa
+    // ~1 MB minificado: se sube el límite de aviso para no ensuciar el build.
+    chunkSizeWarningLimit: 1100,
+  },
 })

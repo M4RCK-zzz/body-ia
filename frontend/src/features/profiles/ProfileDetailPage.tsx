@@ -64,18 +64,23 @@ export function ProfileDetailPage() {
             <AccessBadge level={p.my_access} />
           </h1>
         </div>
-        {isOwner && p.status !== "restricted" ? (
-          <button
-            type="button"
-            className={`bv-btn ${isActive ? "bv-btn--danger" : "bv-btn--primary"}`}
-            disabled={statusChange.isPending}
-            onClick={() =>
-              statusChange.mutate({ id: p.id, action: isActive ? "archive" : "restore" })
-            }
-          >
-            {isActive ? "Archivar expediente" : "Restaurar expediente"}
-          </button>
-        ) : null}
+        <div className="bv-actions">
+          <Link to={`/viewer/${p.id}`} className="bv-btn bv-btn--small">
+            Abrir visor 3D
+          </Link>
+          {isOwner && p.status !== "restricted" ? (
+            <button
+              type="button"
+              className={`bv-btn ${isActive ? "bv-btn--danger" : "bv-btn--primary"}`}
+              disabled={statusChange.isPending}
+              onClick={() =>
+                statusChange.mutate({ id: p.id, action: isActive ? "archive" : "restore" })
+              }
+            >
+              {isActive ? "Archivar expediente" : "Restaurar expediente"}
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {statusChange.isError ? (
