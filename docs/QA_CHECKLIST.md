@@ -54,8 +54,8 @@
 
 - [ ] **3.1** Suite completa en verde.
   - `cd backend && .venv\Scripts\python.exe -m pytest -q`
-  - Evidencia esperada: **443 passed**, 0 failed (el número sube con cada suite nueva;
-    lo importante es 0 failed). Medición de cierre: **443 passed** (incluye 11 de
+  - Evidencia esperada: **444 passed**, 0 failed (el número sube con cada suite nueva;
+    lo importante es 0 failed). Medición de cierre: **444 passed** (incluye 12 de
     `test_deployment_assets.py`, 13 de `test_health.py` y 11 de `test_rate_limit.py`).
 - [ ] **3.2** `ruff` sin ningún aviso (gate de CI, decisión D13).
   - `.venv\Scripts\ruff.exe check .` → `All checks passed!`

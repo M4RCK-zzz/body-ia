@@ -30,7 +30,7 @@ Subida y borrado requieren: acceso **owner/editor** + consentimiento `data_proce
 ### Verificación
 ```powershell
 # Backend (desde backend/)
-python -m pytest -q              # 443 tests (suites de fases 1-9 + admin)
+python -m pytest -q              # 444 tests (suites de fases 1-9 + admin)
 ruff check .                     # 0 avisos (gate de CI)
 # Frontend (desde frontend/)
 npm run build && npm run lint
@@ -456,7 +456,7 @@ y auditoría de cada borrado. Nunca toca `measurements`, `pose_analyses` ni `aud
 
 ```powershell
 cd backend
-.venv\Scripts\python.exe -m pytest -q        # 443 passed
+.venv\Scripts\python.exe -m pytest -q        # 444 passed
 .venv\Scripts\ruff.exe check .                 # 0 avisos
 .venv\Scripts\python.exe -m alembic check     # sin divergencias metadata/migraciones
 cd ..\frontend

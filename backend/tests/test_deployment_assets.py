@@ -176,6 +176,15 @@ def test_env_templates_cover_every_setting() -> None:
     assert not missing, f".env.prod.example sin: {sorted(missing)}"
 
 
+def test_requirements_dev_pulls_the_runtime_requirements() -> None:
+    """El CI instala solo `requirements-dev.txt`: sin `-r requirements.txt` no hay
+    `alembic` ni FastAPI y el paso de migraciones falla."""
+    dev = (ROOT / "backend" / "requirements-dev.txt").read_text(encoding="utf-8")
+    lines = [line.strip() for line in dev.splitlines() if line.strip()]
+    assert "-r requirements.txt" in lines
+    assert any(line.startswith("pyyaml") for line in lines), "validate_compose.py lo necesita"
+
+
 def test_env_prod_template_has_no_real_secrets() -> None:
     template = (ROOT / ".env.prod.example").read_text(encoding="utf-8")
     assert "CAMBIA-ESTE-SECRETO" in template
