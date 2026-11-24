@@ -186,6 +186,36 @@
 
 ---
 
+## 9bis. Panel de Administración
+
+- [ ] **9bis.1** El enlace **Administración** aparece solo con rol `admin`.
+  - Sesión con rol `admin` → el ítem del menú lleva a `/admin`.
+  - Sesión estándar → el ítem **no** aparece en el menú.
+- [ ] **9bis.2** La ruta `/admin` está protegida también escribiéndola a mano.
+  - Usuario estándar → pantalla **Acceso denegado** (403), sin datos de administración.
+  - Sin sesión → redirección a `/login`.
+- [ ] **9bis.3** El backend impone la regla, no solo la UI.
+  - `GET /api/admin/users` con token de usuario estándar → **403**; sin token → **401**.
+- [ ] **9bis.4** Aviso permanente de alcance visible en la vista:
+  "El rol de Administrador no da acceso a expedientes".
+- [ ] **9bis.5** Pestaña **Usuarios**: listado paginado (nombre, correo, roles, estado, alta,
+  último acceso), búsqueda por nombre/correo y filtros de rol y estado.
+  - `pytest tests/test_admin_api.py -q` → 15 passed.
+- [ ] **9bis.6** Activar/desactivar una cuenta funciona y queda auditado
+  (`admin.user_activated` / `admin.user_deactivated`) sin recargar la página.
+- [ ] **9bis.7** Gestión de roles: se abre el diálogo, se guardan y la fila se actualiza;
+  el evento `admin.roles_changed` aparece en la pestaña de auditoría con `before`/`after`.
+- [ ] **9bis.8** Un administrador **no** puede desactivarse ni quitarse `admin` a sí mismo:
+  botón deshabilitado con el motivo; forzando la llamada, la API responde **422** con el
+  mensaje y la UI lo muestra.
+- [ ] **9bis.9** Pestaña **Auditoría**: tabla paginada con fecha, acción legible + código,
+  actor resuelto (no UUID), recurso, resumen del `detail`, `request_id` y "Ver detalle" con
+  el JSON. Filtros por acción, usuario y rango de fechas funcionando.
+- [ ] **9bis.10** Pestaña **Workers**: los cuatro workers con último latido, estado (vivo,
+  sin latido, vivo con error) e iteraciones; se refresca sola cada 30 s.
+- [ ] **9bis.11** Accesibilidad: pestañas con `role=tab`/`aria-selected`, tablas con `caption`
+  y `th scope`, foco visible y ningún par texto/fondo por debajo de AA.
+
 ## 10. Regresión manual por fase
 
 - [ ] **10.1 (F2)** Crear expediente, registrar medición, ver que aparece en el listado.

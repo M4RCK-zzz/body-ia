@@ -1,3 +1,5 @@
+import type { WorkersHealth } from "@/types/admin";
+
 export interface HealthResponse {
   status: 'ok' | 'degraded'
   service: string
@@ -6,3 +8,5 @@ export interface HealthResponse {
   database: 'up' | 'down'
   timestamp: string
 }
+
+export type { WorkersHealth }

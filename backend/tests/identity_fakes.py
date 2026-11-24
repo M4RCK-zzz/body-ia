@@ -81,11 +81,34 @@ class InMemoryUserRepository(UserRepository):
     def get_by_email(self, email: str) -> User | None:
         return next((u for u in self.items.values() if u.email == email), None)
 
+    def get_many(self, user_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, User]:
+        return {uid: self.items[uid] for uid in set(user_ids) if uid in self.items}
+
     def set_roles(self, user: User, role_names: Sequence[str]) -> None:
         user.roles = [Role(name=n, description="") for n in sorted(set(role_names))]
 
-    def list_page(self, *, limit: int, offset: int) -> tuple[list[User], int]:
-        ordered = sorted(self.items.values(), key=lambda u: u.created_at, reverse=True)
+    def list_page(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        search: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None,
+    ) -> tuple[list[User], int]:
+        rows = list(self.items.values())
+        if search:
+            needle = search.casefold()
+            rows = [
+                u
+                for u in rows
+                if needle in u.full_name.casefold() or needle in u.email.casefold()
+            ]
+        if role is not None:
+            rows = [u for u in rows if role in u.role_names]
+        if is_active is not None:
+            rows = [u for u in rows if u.is_active is is_active]
+        ordered = sorted(rows, key=lambda u: u.created_at, reverse=True)
         return ordered[offset : offset + limit], len(ordered)
 
 
@@ -103,14 +126,21 @@ class InMemoryAuditRepository(AuditRepository):
         offset: int,
         action: str | None = None,
         actor_user_id: uuid.UUID | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> tuple[list[AuditEvent], int]:
         items = [
             e
             for e in reversed(self.events)
             if (action is None or e.action == action)
             and (actor_user_id is None or e.actor_user_id == actor_user_id)
+            and (since is None or e.occurred_at >= since)
+            and (until is None or e.occurred_at <= until)
         ]
         return items[offset : offset + limit], len(items)
+
+    def distinct_actions(self) -> list[str]:
+        return sorted({e.action for e in self.events})
 
     def actions(self) -> list[str]:
         return [e.action for e in self.events]

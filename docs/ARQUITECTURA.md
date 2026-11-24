@@ -547,3 +547,48 @@ pueda desplegar, observar y recuperar.
 - **Documentación de cierre:** `docs/QA_CHECKLIST.md` (60 ítems con evidencia),
   `docs/SEGURIDAD_Y_PRIVACIDAD.md` (modelo de amenazas, mapa de datos, riesgos residuales),
   8 runbooks y este ADR. El proyecto queda cerrado en sus 9 fases.
+
+## ADR-011 · Panel de Administración en el frontend (ampliación de la Fase 9)
+
+**Estado:** Aceptada
+
+### Contexto
+
+Los endpoints `/api/admin/*` existían desde la Fase 3 y estaban cubiertos por tests, pero el
+enlace **Administración** del `SideNav` seguía deshabilitado con la etiqueta "Fase 3". La
+gestión de cuentas y roles solo era posible con `curl` o con `create-admin.ps1`, y los
+`audit_events` solo se podían leer desde PostgreSQL. Faltaba la capa de producto.
+
+### Decisiones
+
+1. **El guard de ruta es UX, no seguridad.** `RequireAdmin` muestra un 403 explícito (no una
+   redirección silenciosa) y el enlace del menú se **oculta** a quien no es administrador. La
+   autorización real sigue en `require_admin` (backend, `403`): el guard no puede ser la única
+   barrera, y hay tests que fijan las dos caras.
+2. **`admin` sigue sin acceso implícito a expedientes.** Es una regla de fases 3–8 y la vista la
+   declara de forma permanente en un aviso; además el listado de usuarios no devuelve ningún
+   campo corporal ni identificador de expediente.
+3. **Filtros nuevos aditivos, no un contrato nuevo.** `list_page` de usuarios y auditoría aceptan
+   `search`, `role`, `is_active`, `actor_user_id`, `since` y `until` **opcionales**; sin ellos se
+   comporta exactamente como antes. Se añadió `GET /api/admin/audit-actions` para no ofrecer
+   filtros que no existen en la tabla.
+4. **La auditoría resuelve actores en la misma respuesta.** `audit_events` guarda solo
+   `actor_user_id`; añadir `actors: [{id, email, full_name}]` en la página visible evita N
+   peticiones y no expone el hash de contraseña ni los roles del actor.
+5. **Los límites de auto-gestión se muestran, no se descubren.** El backend ya impedía que un
+   administrador se desactivara o se quitara el rol `admin`; la UI deshabilita el control con el
+   motivo y, si aun así llega un `422`, muestra el mensaje real del servidor.
+6. **La pestaña vive en la URL** (`/admin?tab=audit`): enlaces compartibles y recarga sin perder
+   el contexto, coherente con el resto de vistas.
+7. **Los helpers de formato salen de los componentes** (`features/admin/format.ts`) para no
+   romper el hot reload (`react-refresh/only-export-components`), que era un warning real de
+   lint.
+
+### Consecuencias
+
+- Nuevos ficheros: `types/admin.ts`, `services/api/admin.ts`, `features/admin/*`
+  (`AdminPage`, `RequireAdmin`, `RoleTags`, `format.ts`, `admin.css`, `hooks/useAdmin.ts` y
+  componentes de las tres pestañas).
+- Backend: filtros opcionales en `UserRepository`/`AuditRepository` y sus implementaciones,
+  `distinct_actions()`, `get_many()`, `resolve_actors()` y `tests/test_admin_api.py` (15 tests).
+- `ROLE_DESCRIPTIONS` se centraliza en `features/auth/roles.ts`, espejo del backend.

@@ -15,6 +15,8 @@ import { AnalyticsPage } from "@/features/analytics/AnalyticsPage";
 import { SimulationsPage } from "@/features/simulations/SimulationsPage";
 import { SimulationWorkspacePage } from "@/features/simulations/SimulationWorkspacePage";
 import { SimulationDetailPage } from "@/features/simulations/SimulationDetailPage";
+import { AdminPage } from "@/features/admin/AdminPage";
+import { RequireAdmin } from "@/features/admin/RequireAdmin";
 import { AppShell } from "../layouts/AppShell";
 import { NotFoundPage } from "./NotFoundPage";
 import { LazyViewer } from "./LazyViewer";
@@ -43,6 +45,14 @@ export const router = createBrowserRouter([
       { path: "simulations", element: <SimulationsPage /> },
       { path: "simulations/:profileId", element: <SimulationWorkspacePage /> },
       { path: "simulations/:profileId/:simulationId", element: <SimulationDetailPage /> },
+      {
+        path: "admin",
+        element: (
+          <RequireAdmin>
+            <AdminPage />
+          </RequireAdmin>
+        ),
+      },
       { path: "viewer", element: <LazyViewer /> },
       { path: "viewer/:profileId", element: <LazyViewer /> },
       { path: "*", element: <NotFoundPage /> },

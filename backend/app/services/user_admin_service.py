@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from app.core.errors import BusinessRuleError, NotFoundError
 from app.domain.identity import AuditAction, RoleName
@@ -27,13 +28,50 @@ class UserAdminService:
         self._audit = audit
         self._tx = tx
 
-    def list_users(self, *, limit: int, offset: int) -> tuple[list[User], int]:
-        return self._users.list_page(limit=limit, offset=offset)
+    def list_users(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        search: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None,
+    ) -> tuple[list[User], int]:
+        cleaned = (search or "").strip() or None
+        return self._users.list_page(
+            limit=limit, offset=offset, search=cleaned, role=role, is_active=is_active
+        )
 
     def list_audit_events(
-        self, *, limit: int, offset: int, action: str | None = None
+        self,
+        *,
+        limit: int,
+        offset: int,
+        action: str | None = None,
+        actor_user_id: uuid.UUID | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
     ) -> tuple[list[AuditEvent], int]:
-        return self._audit_repository.list_page(limit=limit, offset=offset, action=action)
+        return self._audit_repository.list_page(
+            limit=limit,
+            offset=offset,
+            action=action or None,
+            actor_user_id=actor_user_id,
+            since=since,
+            until=until,
+        )
+
+    def audit_actions(self) -> list[str]:
+        return self._audit_repository.distinct_actions()
+
+    def resolve_actors(self, user_ids: Sequence[uuid.UUID | None]) -> dict[uuid.UUID, User]:
+        """Etiquetas legibles de los actores de una página de auditoría.
+
+        La tabla solo guarda `actor_user_id`; sin esto la UI mostraría UUIDs. Se
+        resuelven en una sola consulta y solo para los ids presentes en la página.
+        """
+        wanted = [user_id for user_id in user_ids if user_id is not None]
+        return self._users.get_many(wanted)
 
     def _get(self, user_id: uuid.UUID) -> User:
         user = self._users.get(user_id)

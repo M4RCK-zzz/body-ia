@@ -4,10 +4,11 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.domain.identity import RoleName
 from app.models.audit_event import AuditEvent
+from app.models.identity import User
 from app.schemas.auth import UserRead
 
 
@@ -22,6 +23,25 @@ class UserPage(BaseModel):
     total: int
     limit: int
     offset: int
+    # `admin` se incluye porque el panel gestiona cuentas y roles, no expedientes:
+    # el backend sigue negando el acceso implícito a datos corporales.
+    can_manage: bool = True
+
+
+class UserSummary(BaseModel):
+    """Identidad mínima de un actor de auditoría (sin datos de acceso).
+
+    La tabla `audit_events` guarda solo `actor_user_id`; el panel resuelve los
+    nombres de la página visible para no mostrar UUIDs ilegibles.
+    """
+
+    id: uuid.UUID
+    email: EmailStr
+    full_name: str
+
+    @classmethod
+    def from_user(cls, user: User) -> UserSummary:
+        return cls(id=user.id, email=user.email, full_name=user.full_name)
 
 
 class AuditEventRead(BaseModel):
@@ -53,3 +73,10 @@ class AuditEventPage(BaseModel):
     total: int
     limit: int
     offset: int
+    actors: list[UserSummary] = Field(
+        default_factory=list, description="Actores distintos presentes en esta página"
+    )
+
+
+class AuditActionsResponse(BaseModel):
+    actions: list[str] = Field(default_factory=list)

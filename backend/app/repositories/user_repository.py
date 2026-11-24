@@ -20,7 +20,19 @@ class UserRepository(ABC):
     def get_by_email(self, email: str) -> User | None: ...
 
     @abstractmethod
+    def get_many(self, user_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, User]:
+        """Usuarios por id, en una sola consulta (etiquetas de actor en auditoría)."""
+
+    @abstractmethod
     def set_roles(self, user: User, role_names: Sequence[str]) -> None: ...
 
     @abstractmethod
-    def list_page(self, *, limit: int, offset: int) -> tuple[list[User], int]: ...
+    def list_page(
+        self,
+        *,
+        limit: int,
+        offset: int,
+        search: str | None = None,
+        role: str | None = None,
+        is_active: bool | None = None,
+    ) -> tuple[list[User], int]: ...

@@ -311,6 +311,38 @@ Checklist manual:
    "base corregida después de calcularlo".
 8. Archivar un escenario con otro usuario (sin `OWNER`) → `insufficient_access`.
 
+## Administración (panel de administrador)
+
+La entrada **Administración** del menú lateral solo aparece a las cuentas con rol `admin`;
+el resto ve la ruta protegida con un 403 explícito y el backend responde `403` en
+`/api/admin/*`. **El rol de administrador no da acceso a expedientes**: se gestionan cuentas y
+roles, no datos corporales, y la vista lo dice de forma permanente.
+
+| Pestaña | Qué hace | Endpoint |
+|---|---|---|
+| **Usuarios** | Listado paginado con búsqueda por nombre/correo, filtro por rol y estado; activar/desactivar cuentas y editar roles | `GET /api/admin/users`, `PUT /api/admin/users/{id}/roles`, `POST /api/admin/users/{id}/activate|deactivate` |
+| **Auditoría** | Tabla paginada de `audit_events` con fecha, acción legible + código, actor, recurso, resumen del `detail` y `request_id`; filtros por acción, usuario y rango de fechas | `GET /api/admin/audit-events`, `GET /api/admin/audit-actions` |
+| **Workers** | Latidos de `pose`, `report`, `simulation` y `retention` con último latido, estado y último error; se refresca cada 30 s | `GET /api/health/workers` |
+
+Reglas que la UI refleja y el backend impone: un administrador **no puede desactivar su propia
+cuenta** ni **quitarse el rol `admin`** a sí mismo (botón deshabilitado con el motivo + el error
+real del servidor si aun así se intenta), y un usuario **no puede quedarse sin roles**. Cada
+cambio de roles o de estado queda auditado (`admin.roles_changed`, `admin.user_activated`,
+`admin.user_deactivated`).
+
+Los filtros de búsqueda, rol, estado, actor y fechas se añadieron en el backend como parámetros
+**opcionales**: sin ellos el endpoint se comporta exactamente como antes.
+
+### Verificación
+
+```powershell
+cd backend
+.venv\Scripts\python.exe -m pytest -q tests\test_admin_api.py   # 15 passed
+cd ..\frontend
+npm run lint
+npm run build
+```
+
 ## Fase 9 - Producción, QA y operación
 
 La Fase 9 **no añade producto**: hace que lo construido en las fases 1–8 se pueda
