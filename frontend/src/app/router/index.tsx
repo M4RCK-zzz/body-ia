@@ -9,6 +9,9 @@ import { CaptureHomePage } from "@/features/capture/CaptureHomePage";
 import { CapturePage } from "@/features/capture/CapturePage";
 import { PoseListPage } from "@/features/pose/PoseListPage";
 import { PoseAnalysisDetailPage } from "@/features/pose/PoseAnalysisDetailPage";
+import { ReportsPage } from "@/features/reports/ReportsPage";
+import { ReportDetailPage } from "@/features/reports/ReportDetailPage";
+import { AnalyticsPage } from "@/features/analytics/AnalyticsPage";
 import { AppShell } from "../layouts/AppShell";
 import { NotFoundPage } from "./NotFoundPage";
 import { LazyViewer } from "./LazyViewer";
@@ -31,6 +34,9 @@ export const router = createBrowserRouter([
       { path: "capture/:profileId", element: <CapturePage /> },
       { path: "analyses", element: <PoseListPage /> },
       { path: "analyses/:id", element: <PoseAnalysisDetailPage /> },
+      { path: "reports", element: <ReportsPage /> },
+      { path: "reports/:reportId", element: <ReportDetailPage /> },
+      { path: "analytics/:profileId", element: <AnalyticsPage /> },
       { path: "viewer", element: <LazyViewer /> },
       { path: "viewer/:profileId", element: <LazyViewer /> },
       { path: "*", element: <NotFoundPage /> },

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from uuid import UUID
 
 from app.models.pose import PoseAnalysis
@@ -39,6 +40,10 @@ class PoseRepository(ABC):
         limit: int,
         offset: int,
     ) -> tuple[list[PoseAnalysis], int]: ...
+
+    @abstractmethod
+    def count_by_profile_status(self, profile_ids: Iterable[UUID]) -> dict[str, int]:
+        """Conteo de análisis por estado en los expedientes indicados (dashboard)."""
 
     @abstractmethod
     def claim_next(self) -> PoseAnalysis | None:

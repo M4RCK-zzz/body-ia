@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     pose_review_threshold: int = Field(default=10, ge=1, le=32)
     pose_visibility_threshold: float = Field(default=0.5, ge=0.1, le=1.0)
 
+    # --- Reportes (Fase 7) ---
+    report_poll_seconds: float = Field(default=5.0, ge=0.5, le=60.0)
+    report_stale_processing_seconds: int = Field(default=1800, ge=60, le=86400)
+
     # --- Identidad (Fase 3) ---
     jwt_secret: SecretStr
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"

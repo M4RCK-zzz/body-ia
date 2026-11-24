@@ -19,8 +19,8 @@
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| 5 | Análisis de pose (MediaPipe, worker asíncrono, revisión) | En progreso |
-| 6 | Visor 3D (activos GLB/GLTF, R3F, capas) | Planeada |
-| 7 | Analítica y reportes | Planeada |
+| 5 | Análisis de pose (MediaPipe, worker asíncrono, revisión) | Cerrada |
+| 6 | Visor 3D (activos GLB/GLTF, R3F, capas) | Cerrada |
+| 7 | Analítica descriptiva y reportes CSV/PDF (worker, auditoría, dashboard real) | Cerrada |
 | 8 | Simulación hipotética (escenarios aislados) | Planeada |
 | 9 | Producción: CI/CD, observabilidad, retención, admin UI, QA/SEGURIDAD | Planeada |

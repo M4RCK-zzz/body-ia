@@ -6,6 +6,7 @@ from app.models.measurement import Measurement
 from app.models.media import MediaAsset
 from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
+from app.models.report import Report
 
 __all__ = [
     "AuditEvent",
@@ -16,6 +17,7 @@ __all__ = [
     "Measurement",
     "Profile",
     "ProfileAccess",
+    "Report",
     "Role",
     "User",
     "user_roles",

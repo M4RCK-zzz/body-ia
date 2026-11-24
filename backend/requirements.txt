@@ -16,3 +16,9 @@ python-multipart==0.0.34
 # (Windows) y py3-none para Linux/macOS; requires_python=None en PyPI.
 # El binario se importa lazy en workers/pose_runner.py; la API y los tests no lo requieren.
 mediapipe==1.2.3
+
+# --- Reportes (Fase 7) ---
+# fpdf2==2.9.0: Python puro (wheel py3-none-any, sin extensiones nativas),
+# requires_python >=3.11 y clasifica 3.13 -> compatible con Windows + Python 3.13.
+# No se usan fuentes del sistema: el PDF solo emplea las fuentes core (latin-1).
+fpdf2==2.9.0

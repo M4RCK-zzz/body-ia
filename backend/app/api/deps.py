@@ -17,22 +17,27 @@ from app.repositories.sqlalchemy_access_repository import (
     SqlAlchemyConsentRepository,
     SqlAlchemyProfileAccessRepository,
 )
+from app.repositories.sqlalchemy_analytics_repository import SqlAlchemyAnalyticsRepository
 from app.repositories.sqlalchemy_audit_repository import SqlAlchemyAuditRepository
 from app.repositories.sqlalchemy_measurement_repository import SqlAlchemyMeasurementRepository
 from app.repositories.sqlalchemy_media_repository import SqlAlchemyMediaRepository
 from app.repositories.sqlalchemy_pose_repository import SqlAlchemyPoseRepository
 from app.repositories.sqlalchemy_profile_repository import SqlAlchemyProfileRepository
+from app.repositories.sqlalchemy_report_repository import SqlAlchemyReportRepository
 from app.repositories.sqlalchemy_user_repository import SqlAlchemyUserRepository
 from app.services.access_guard import AccessGuard
+from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditRecorder
 from app.services.auth_service import AuthPolicy, AuthService
 from app.services.consent_service import ConsentService
+from app.services.dashboard_service import DashboardService
 from app.services.health_service import HealthService
 from app.services.measurement_service import MeasurementService
 from app.services.media_service import MediaService
 from app.services.pose_service import PoseService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
+from app.services.report_service import ReportService
 from app.services.user_admin_service import UserAdminService
 
 
@@ -179,4 +184,39 @@ def get_pose_service(db: Session = Depends(get_db)) -> PoseService:
         consents=get_consent_service(db),
         audit=_audit(db),
         tx=SessionTransaction(db),
+    )
+
+
+def get_analytics_service(
+    db: Session = Depends(get_db), catalog: MetricCatalog = Depends(get_metric_catalog)
+) -> AnalyticsService:
+    return AnalyticsService(
+        get_access_guard(db),
+        SqlAlchemyAnalyticsRepository(db),
+        catalog,
+        _audit(db),
+        SessionTransaction(db),
+    )
+
+
+def get_report_service(
+    db: Session = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+) -> ReportService:
+    return ReportService(
+        guard=get_access_guard(db),
+        reports=SqlAlchemyReportRepository(db),
+        storage=storage,
+        audit=_audit(db),
+        tx=SessionTransaction(db),
+    )
+
+
+def get_dashboard_service(db: Session = Depends(get_db)) -> DashboardService:
+    return DashboardService(
+        SqlAlchemyProfileRepository(db),
+        SqlAlchemyAnalyticsRepository(db),
+        SqlAlchemyPoseRepository(db),
+        _audit(db),
+        SessionTransaction(db),
     )

@@ -65,6 +65,9 @@ export function ProfileDetailPage() {
           </h1>
         </div>
         <div className="bv-actions">
+          <Link to={`/analytics/${p.id}`} className="bv-btn bv-btn--small">
+            Ver analítica
+          </Link>
           <Link to={`/viewer/${p.id}`} className="bv-btn bv-btn--small">
             Abrir visor 3D
           </Link>

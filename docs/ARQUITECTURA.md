@@ -235,3 +235,92 @@ no tiene `LICENSE` en la raíz y su `README` advierte de la restricción del ri�
   botón "Abrir visor 3D" en la ficha del expediente.
 - Fase 7 (reportes) y Fase 8 (simulador) reutilizarán este visor como base; ninguna
   deberá presentar la geometría como medición.
+
+## ADR-008 · Analítica descriptiva y reportes trazables (Fase 7)
+
+**Estado:** Aceptada (Fase 7)
+
+### Contexto
+
+Con las fases 2–6 cerradas hay mediciones inmutables y versionadas, consentimiento con
+auditoría y análisis de pose etiquetados como estimación. El Documento Maestro (MOD-06,
+RF-010/011) pide **analítica y reportes**: que el usuario pueda ver la evolución de su
+expediente y descargar un documento. El riesgo evidente es que un "informe" se lea como
+diagnóstico o que un reporte mezcle mediciones observadas con estimaciones de pose.
+
+### Decisiones
+
+1. **Analítica solo descriptiva.** Se calculan último valor, valor anterior, delta absoluto,
+   delta porcentual, mínimo, máximo, media, mediana, conteo `n`, correcciones vigentes,
+   fechas de la primera/última toma y atípicos marcados (mediana ± 3.5·MAD, con ≥3 puntos y
+   MAD > 0). **No hay regresión, tendencia proyectada, predicción ni interpretación clínica.**
+   No existe columna, campo ni endpoint de pronóstico.
+2. **Sin datos se representa como ausencia, no como 0.** `summarize_series` devuelve `count=0`
+   y todos los valores `None`; el CSV deja celdas vacías y la UI muestra "—". Las métricas del
+   catálogo sin datos se listan explícitamente en `metrics_without_data`. Nunca se interpola.
+3. **Separación estricta por `DataKind`.** `measurements_csv/pdf` son `observed`;
+   `pose_csv/pdf` son `visual_estimate`. El tipo de reporte fija el `DataKind` en el dominio
+   (`REPORT_DATA_KIND`), no el cliente, y `metrics` solo se acepta en reportes de mediciones
+   (422 en caso contrario). El documento de pose no puede contener filas de mediciones.
+4. **Generación asíncrona en PostgreSQL, sin cola externa.** `reports` actúa de cola:
+   `queued → processing → generated | failed`. El worker reserva con
+   `SELECT ... FOR UPDATE SKIP LOCKED`, marca `processing` con `started_at` y hace commit
+   por iteración. Idempotencia: POST repetido sobre el mismo expediente/kind/rango en
+   `queued`/`processing` devuelve `200` con el reporte existente (`201` solo al crear).
+   `processing` más antiguo que `REPORT_STALE_PROCESSING_SECONDS` (default 1800 s) pasa a
+   `failed` con `processing_stale`.
+5. **Binarios fuera de PostgreSQL.** El renderizado (`fpdf2==2.9.0`, Python puro; CSV con
+   `csv.writer`) produce bytes y el worker los escribe con `StorageBackend` privado usando
+   una clave UUID nueva (`<uuid>.csv|pdf`). En la tabla solo viven `storage_key`,
+   `checksum_sha256`, `size_bytes` y `mime_type`. Una clave nueva por intento evita
+   sobrescribir y deja rastro de intentos previos.
+6. **Trazabilidad completa.** Cada reporte guarda `requested_by_snapshot` (nombre congelado),
+   `requested_by_user_id`, `parameters_json` con el código de expediente y el sello del
+   pedido, `summary_json` con lo que se incluyó, `attempt_count` y `duration_ms`. La
+   auditoría registra `report.requested`, `report.generated`, `report.failed` y
+   `report.downloaded`; la analítica registra `analytics.viewed` y el panel `dashboard.viewed`.
+7. **Descarga autenticada, nunca pública.** `GET /api/reports/{id}/content` exige sesión y
+   acceso vigente al expediente, **revalida el checksum SHA-256** del binario antes de
+   servirlo y responde con `Cache-Control: private, no-store`,
+   `X-Content-Type-Options: nosniff` y `Content-Disposition: attachment`. Si el archivo no
+   coincide con el checksum registrado se rechaza (409) en lugar de entregarse.
+8. **PDF solo con fuentes core (latin-1).** El renderizador normaliza el texto a latin-1
+   (`_pdf_text`) y no depende de fuentes del sistema ni de binarios externos: el documento se
+   genera igual en Windows y en Linux. Cada página lleva el aviso no clínico y numeración.
+9. **Formato de CSV estable.** Delimitador `;`, fin de línea `\r\n`, cabecera `#` con
+   `report_id`, expediente, `data_kind`, solicitante, fechas, generador y aviso; después una
+   fila por medición vigente y un bloque `# RESUMEN DESCRIPTIVO`. Los valores son
+   deterministas (cuantizados a 2 decimales) para que el checksum sea reproducible.
+10. **Dashboard con datos reales y sin fuga entre usuarios.** `GET /api/dashboard/summary`
+    agrega **solo expedientes con acceso vigente** (`revoked_at IS NULL`) del usuario; el rol
+    `admin` no obtiene acceso implícito. Mediciones y estimaciones de pose se cuentan en
+    campos distintos: nunca se suma una estimación a las mediciones observadas. Desaparecen
+    los placeholders "Disponible en Fase 2".
+11. **Aviso no clínico permanente.** El texto está en el dominio (`DISCLAIMER`), en la
+    cabecera y el pie del PDF, en la cabecera del CSV, en la página de analítica y en el
+    detalle del reporte. No es configurable desde el cliente.
+
+### Compromisos conocidos aceptados
+
+- Sin reintentos automáticos: un reporte `failed` requiere una nueva solicitud del usuario.
+- El worker de reportes se levanta aparte (`scripts/run-report-worker.ps1`, o `--once` para
+  lotes); sin él, los reportes quedan `queued` (la UI lo refresca sola y lo indica).
+- El tope de 500 análisis por reporte de pose acota documentos muy grandes; el resumen
+  indica `pose_analyses_total_profile` para que la diferencia sea visible.
+- No se purgan reportes generados en esta fase: la retención entra con la Fase 9.
+- Sin `pytest` de render WebGL ni de fpdf2 en Windows; la verificación es de bytes
+  (`%PDF-`/`%%EOF`, cabecera CSV) y el build del frontend.
+
+### Consecuencias
+
+- Tabla nueva `reports` (migración `0007_reports`) con CHECKs de `kind`, `status`,
+  invariantes de ciclo de vida y de periodo.
+- Endpoints nuevos: `POST|GET /api/profiles/{id}/reports`, `GET /api/reports`,
+  `GET /api/reports/{id}`, `GET /api/reports/{id}/content`,
+  `GET /api/profiles/{id}/analytics`, `GET /api/dashboard/summary`.
+- Config nueva: `REPORT_POLL_SECONDS`, `REPORT_STALE_PROCESSING_SECONDS`.
+- Frontend: ítem **Reportes** activo en `SideNav`; rutas `/reports`, `/reports/:id`,
+  `/analytics/:profileId`; botón "Ver analítica" en la ficha del expediente; dashboard con
+  KPIs reales.
+- Fase 8 (simulador) deberá declararse `simulation` y no podrá escribir en `reports` como
+  si fueran mediciones.

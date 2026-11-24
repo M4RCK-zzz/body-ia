@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from datetime import datetime
 from uuid import UUID
 
@@ -77,6 +78,17 @@ class SqlAlchemyPoseRepository(PoseRepository):
         total = self._session.scalar(select(func.count()).select_from(base.subquery())) or 0
         rows = self._session.execute(base.limit(limit).offset(offset)).scalars().all()
         return list(rows), total
+
+    def count_by_profile_status(self, profile_ids: Iterable[UUID]) -> dict[str, int]:
+        ids = list(profile_ids)
+        if not ids:
+            return {}
+        stmt = (
+            select(PoseAnalysis.status, func.count())
+            .where(PoseAnalysis.profile_id.in_(ids))
+            .group_by(PoseAnalysis.status)
+        )
+        return {status: total for status, total in self._session.execute(stmt).all()}
 
     def claim_next(self) -> PoseAnalysis | None:
         stmt = (

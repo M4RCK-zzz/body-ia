@@ -26,7 +26,9 @@ MIME_TO_EXTENSION: dict[str, str] = {
     MediaMime.WEBP.value: ".webp",
 }
 
-STORAGE_KEY_PATTERN = re.compile(r"^[0-9a-f-]{36}\.(jpg|png|webp)$")
+# Claves de storage: UUID + extensión canónica. Además de las capturas (Fase 4),
+# los reportes generados (Fase 7) escriben CSV/PDF en el mismo storage privado.
+STORAGE_KEY_PATTERN = re.compile(r"^[0-9a-f-]{36}\.(jpg|png|webp|csv|pdf)$")
 
 MAX_STORAGE_KEY_LENGTH = 96
 MAX_SIDE_PIXELS = 8000

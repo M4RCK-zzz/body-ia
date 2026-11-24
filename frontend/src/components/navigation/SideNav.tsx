@@ -13,7 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Análisis de pose', to: '/analyses' },
   { label: 'Visor 3D', to: '/viewer' },
   { label: 'Simulador', phase: 8 },
-  { label: 'Reportes', phase: 7 },
+  { label: 'Reportes', to: '/reports' },
   { label: 'Administración', phase: 3 },
 ]
 

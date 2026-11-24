@@ -89,7 +89,7 @@ Si el modelo no existe, el worker **falla claro al arrancar** con mensaje explí
 - Sin reintentos automáticos en Fase 5: un análisis `failed` requiere un nuovo POST explícito.
 
 ### Pruebas/observabilidad
-- Tests: `python -m pytest` (187 tests, incluye Fase 5: servicio, worker sin binario `mediapipe` y API).
+- Tests: `python -m pytest` (incluye Fase 5: servicio, worker sin binario `mediapipe` y API).
 - En Windows con Postgres arriba: `alembic upgrade head` (debe crear `pose_analyses`) antes de levantar API/worker.
 
 ## Fase 6 - Visor 3D anatómico (atlas genérico, CC BY-SA)
@@ -163,3 +163,72 @@ Checklist manual en el navegador:
 8. **Ficha de procedencia** muestra autoría, CC BY-SA 4.0, componentes retirados y sha256 por capa.
 9. **Abrir visor 3D** desde un expediente (`/viewer/:profileId`) muestra el código del expediente y el aviso de que no se superpone con sus datos.
 10. **Móvil / ventana estrecha**: DPR limitado, sin antialias ni sombras, el panel pasa debajo del visor.
+
+## Fase 7 - Analítica descriptiva y reportes (CSV/PDF)
+
+La analítica es **solo descriptiva**: último valor, valor anterior, delta absoluto y
+porcentual, mínimo/máximo, media, mediana, conteo `n`, correcciones vigentes y atípicos
+marcados (mediana ± 3.5·MAD con ≥3 puntos). **No hay predicción, regresión ni
+interpretación clínica**, y los datos faltantes se muestran como ausencia ("—"), nunca
+como `0.00` ni interpolados.
+
+Los reportes se **separan por `DataKind`**: `measurements_*` son `OBSERVADO` y `pose_*` son
+`ESTIMACIÓN VISUAL`. Un reporte de pose no puede contener mediciones y viceversa.
+
+### Endpoints (Fase 7)
+- `GET /api/profiles/{id}/analytics?window_days=7|30|90` — resumen descriptivo (viewer+).
+  Audita `analytics.viewed`. Incluye `metrics_without_data` y el aviso no clínico.
+- `POST /api/profiles/{id}/reports` — encola un reporte (viewer+). `201` al crear; `200` con
+  el existente si ya hay uno idéntico en cola/proceso (idempotente).
+- `GET /api/profiles/{id}/reports` — reportes del expediente.
+- `GET /api/reports` — reportes solicitados por el usuario (solo expedientes con acceso vigente).
+- `GET /api/reports/{id}` — detalle con `storage_key` oculto, tamaño y checksum.
+- `GET /api/reports/{id}/content` — descarga autenticada; revalida el checksum SHA-256 y
+  responde `Cache-Control: private, no-store` + `Content-Disposition: attachment`.
+- `GET /api/dashboard/summary` — KPIs reales del usuario; nunca agrega expedientes ajenos ni
+  suma estimaciones de pose a las mediciones observadas.
+
+### Worker de reportes (Windows)
+```powershell
+powershell -ExecutionPolicy Bypass -File backend\scripts\run-report-worker.ps1
+# Un solo lote y salir:
+powershell -ExecutionPolicy Bypass -File backend\scripts\run-report-worker.ps1 -Once
+```
+
+El worker reserva con `FOR UPDATE SKIP LOCKED`, renderiza con `fpdf2==2.9.0` (Python puro,
+compatible con Python 3.13 en Windows) y `csv`, y escribe el binario en el storage privado
+(`UPLOAD_DIR`). En PostgreSQL solo quedan la clave, el checksum SHA-256 y el tamaño.
+Si el worker no está levantado, los reportes quedan en `En cola` y la UI se refresca sola.
+
+### Migración y variables
+```powershell
+cd backend
+.venv\Scripts\python.exe -m alembic upgrade head   # aplica 0007_reports
+```
+Variables nuevas en `backend/.env`: `REPORT_POLL_SECONDS=5`,
+`REPORT_STALE_PROCESSING_SECONDS=1800` (ver `.env.example`).
+
+### Frontend
+- **Reportes** activo en el menú lateral → `/reports` (mis reportes) y `/reports/:id`.
+- **Analítica** por expediente → `/analytics/:profileId` o botón "Ver analítica" en la ficha.
+- Dashboard con indicadores reales: desaparecen los textos "Disponible en Fase 2".
+
+### Verificación de Fase 7
+```powershell
+cd backend
+.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\ruff.exe check .
+cd ..\frontend
+npm run lint
+npm run build
+```
+
+Checklist manual:
+1. Ficha de expediente → **Ver analítica**: cambia 7/30/90 días y los valores se recalculan;
+   las métricas sin datos aparecen como "—" y se listan en el aviso superior.
+2. En la misma página, **Solicitar reporte**: elegir "Mediciones (PDF)" y generar.
+3. Levantar el worker de reportes → el estado pasa a **Listo** en unos segundos.
+4. **Reportes → Detalle → Descargar PDF**: el archivo abre con el aviso no clínico en el pie.
+5. Solicitar un reporte de **Pose (CSV)** y comprobar que el documento dice
+   `visual_estimate` y no contiene filas de mediciones.
+6. Dashboard: los tres KPIs muestran números reales y ninguna leyenda "Disponible en Fase 2".

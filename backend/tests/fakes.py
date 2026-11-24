@@ -19,12 +19,16 @@ from app.models.measurement import Measurement
 from app.models.media import MediaAsset
 from app.models.pose import PoseAnalysis
 from app.models.profile import Profile
+from app.models.report import Report
 from app.repositories.access_repository import ConsentRepository, ProfileAccessRepository
+from app.repositories.analytics_repository import AnalyticsRepository
 from app.repositories.measurement_repository import MeasurementRepository
 from app.repositories.media_repository import MediaRepository
 from app.repositories.pose_repository import PoseRepository
 from app.repositories.profile_repository import ProfileRepository
+from app.repositories.report_repository import ReportRepository
 from app.services.access_guard import AccessGuard
+from app.services.analytics_service import AnalyticsService
 from app.services.audit_service import AuditRecorder
 from app.services.consent_service import ConsentService
 from app.services.measurement_service import MeasurementService
@@ -32,13 +36,16 @@ from app.services.media_service import MediaService
 from app.services.pose_service import PoseService
 from app.services.profile_access_service import ProfileAccessService
 from app.services.profile_service import ProfileService
+from app.services.report_service import ReportService
 from tests.identity_fakes import FakeTransaction, InMemoryAuditRepository, InMemoryUserRepository
 
 __all__ = [
     "FakeTransaction",
     "FakeStorageBackend",
+    "InMemoryAnalyticsRepository",
     "InMemoryMediaRepository",
     "InMemoryPoseRepository",
+    "InMemoryReportRepository",
     "Services",
     "build_services",
 ]
@@ -128,9 +135,13 @@ class FakeStorageBackend:
     def __init__(self) -> None:
         self.files: dict[str, bytes] = {}
         self.calls: list[tuple[str, str]] = []
+        # Simula un storage caído (tests del worker de reportes).
+        self.fail_on_put = False
 
     def put(self, key: str, data: bytes) -> None:
         self.calls.append(("put", key))
+        if self.fail_on_put:
+            raise RuntimeError("storage no disponible")
         if key in self.files:
             raise RuntimeError("la clave ya existe")
         self.files[key] = bytes(data)
@@ -241,6 +252,14 @@ class InMemoryPoseRepository(PoseRepository):
             rows = [a for a in rows if a.status == status]
         rows.sort(key=lambda a: (a.created_at, a.id), reverse=True)
         return rows[offset : offset + limit], len(rows)
+
+    def count_by_profile_status(self, profile_ids: Iterable[UUID]) -> dict[str, int]:
+        wanted = set(profile_ids)
+        counts: dict[str, int] = {}
+        for analysis in self.items:
+            if analysis.profile_id in wanted:
+                counts[analysis.status] = counts.get(analysis.status, 0) + 1
+        return counts
 
     def claim_next(self) -> PoseAnalysis | None:
         rows = [
@@ -369,6 +388,167 @@ class InMemoryMeasurementRepository(MeasurementRepository):
         return chain
 
 
+class InMemoryReportRepository(ReportRepository):
+    """Cola de reportes en memoria con la misma semántica que la implementación SQL."""
+
+    def __init__(self, access: InMemoryProfileAccessRepository | None = None) -> None:
+        self.items: list[Report] = []
+        self._access = access
+
+    def get(self, report_id: UUID) -> Report | None:
+        return next((r for r in self.items if r.id == report_id), None)
+
+    def add(self, report: Report) -> Report:
+        if report.id is None:
+            report.id = uuid4()
+        self.items.append(report)
+        return report
+
+    def save(self, report: Report) -> Report:
+        if self.get(report.id) is None:
+            self.items.append(report)
+        return report
+
+    def list_page(
+        self, *, profile_id: UUID, status: str | None, limit: int, offset: int
+    ) -> tuple[list[Report], int]:
+        rows = [r for r in self.items if r.profile_id == profile_id]
+        if status is not None:
+            rows = [r for r in rows if r.status == status]
+        rows.sort(key=lambda r: r.created_at, reverse=True)
+        return rows[offset : offset + limit], len(rows)
+
+    def list_page_for_user(
+        self, *, requested_by_user_id: UUID, status: str | None, limit: int, offset: int
+    ) -> tuple[list[Report], int]:
+        rows = [r for r in self.items if r.requested_by_user_id == requested_by_user_id]
+        if status is not None:
+            rows = [r for r in rows if r.status == status]
+        if self._access is not None:
+            # Mismo criterio que el SQL: el acceso al expediente debe seguir vigente.
+            rows = [
+                r
+                for r in rows
+                if self._access.get_active(r.profile_id, requested_by_user_id) is not None
+            ]
+        rows.sort(key=lambda r: r.created_at, reverse=True)
+        return rows[offset : offset + limit], len(rows)
+
+    def find_active_for_profile(
+        self, *, profile_id: UUID, kind: str, date_from: datetime | None, date_to: datetime | None
+    ) -> Report | None:
+        for report in self.items:
+            if (
+                report.profile_id == profile_id
+                and report.kind == kind
+                and report.status in ("queued", "processing")
+                and report.date_from == date_from
+                and report.date_to == date_to
+            ):
+                return report
+        return None
+
+    def claim_next(self) -> Report | None:
+        queued = [r for r in self.items if r.status == "queued"]
+        queued.sort(key=lambda r: r.created_at)
+        return queued[0] if queued else None
+
+    def mark_stale_failed(self, stale_before: datetime, *, now: datetime, reason: str) -> int:
+        count = 0
+        for report in self.items:
+            if (
+                report.status == "processing"
+                and report.started_at is not None
+                and report.started_at <= stale_before
+            ):
+                report.status = "failed"
+                report.error_message = reason
+                report.completed_at = now
+                count += 1
+        return count
+
+
+class InMemoryAnalyticsRepository(AnalyticsRepository):
+    """Analítica descriptiva sobre el repositorio de mediciones en memoria."""
+
+    def __init__(self, measurements: InMemoryMeasurementRepository) -> None:
+        self._measurements = measurements
+
+    def _current(
+        self,
+        *,
+        profile_id: UUID,
+        metric_type: MeasurementType | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+    ) -> list[Measurement]:
+        rows = [
+            m
+            for m in self._measurements.items
+            if m.profile_id == profile_id and not self._measurements.is_superseded(m.id)
+        ]
+        if metric_type is not None:
+            rows = [m for m in rows if m.metric_type == _val(metric_type)]
+        if date_from is not None:
+            rows = [m for m in rows if m.measured_at >= date_from]
+        if date_to is not None:
+            rows = [m for m in rows if m.measured_at <= date_to]
+        rows.sort(key=lambda m: (m.measured_at, m.recorded_at))
+        return rows
+
+    def current_measurements(
+        self,
+        *,
+        profile_id: UUID,
+        metric_type: MeasurementType,
+        date_from: datetime | None,
+        date_to: datetime | None,
+    ) -> list[Measurement]:
+        return self._current(
+            profile_id=profile_id,
+            metric_type=metric_type,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+    def corrected_count(
+        self,
+        *,
+        profile_id: UUID,
+        metric_type: MeasurementType,
+        date_from: datetime | None,
+        date_to: datetime | None,
+    ) -> int:
+        # Corrección vigente = medición que reemplaza a otra y no fue reemplazada.
+        rows = self._current(
+            profile_id=profile_id,
+            metric_type=metric_type,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        return sum(1 for m in rows if m.supersedes_id is not None)
+
+    def measurement_count(self, profile_id: UUID) -> int:
+        return len(
+            self._current(profile_id=profile_id, metric_type=None, date_from=None, date_to=None)
+        )
+
+    def latest_measurement_at(self, profile_id: UUID) -> datetime | None:
+        rows = self._current(profile_id=profile_id, metric_type=None, date_from=None, date_to=None)
+        return rows[-1].measured_at if rows else None
+
+    def measurement_count_by_profile(self, profile_ids: Iterable[UUID]) -> dict[UUID, int]:
+        return {pid: self.measurement_count(pid) for pid in profile_ids}
+
+    def latest_measurement_by_profile(self, profile_ids: Iterable[UUID]) -> dict[UUID, datetime]:
+        out: dict[UUID, datetime] = {}
+        for pid in profile_ids:
+            latest = self.latest_measurement_at(pid)
+            if latest is not None:
+                out[pid] = latest
+        return out
+
+
 @dataclass
 class Services:
     users: InMemoryUserRepository
@@ -379,7 +559,10 @@ class Services:
     measurements_repo: InMemoryMeasurementRepository
     media_repo: InMemoryMediaRepository
     pose_repo: InMemoryPoseRepository
+    reports_repo: InMemoryReportRepository
+    analytics_repo: InMemoryAnalyticsRepository
     storage: FakeStorageBackend
+    audit: AuditRecorder
     tx: FakeTransaction
     clock: object
     guard: AccessGuard
@@ -389,6 +572,8 @@ class Services:
     measurements: MeasurementService
     media: MediaService
     pose: PoseService
+    analytics: AnalyticsService
+    reports: ReportService
 
     # --- ayudas para los tests ---
     def new_user(self, name: str, role: str = "user") -> User:
@@ -431,6 +616,8 @@ def build_services(clock=utcnow) -> Services:
     media_repo = InMemoryMediaRepository()
     pose_repo = InMemoryPoseRepository()
     storage = FakeStorageBackend()
+    reports_repo = InMemoryReportRepository(access_repo)
+    analytics_repo = InMemoryAnalyticsRepository(measurements_repo)
     guard = AccessGuard(profiles_repo, access_repo, audit, tx)
     consent = ConsentService(guard, consents_repo, audit, tx, clock=clock)
     return Services(
@@ -442,7 +629,10 @@ def build_services(clock=utcnow) -> Services:
         measurements_repo=measurements_repo,
         media_repo=media_repo,
         pose_repo=pose_repo,
+        reports_repo=reports_repo,
+        analytics_repo=analytics_repo,
         storage=storage,
+        audit=audit,
         tx=tx,
         clock=clock,
         guard=guard,
@@ -472,5 +662,21 @@ def build_services(clock=utcnow) -> Services:
             max_upload_bytes=10 * 1024 * 1024,
             max_pixels=25_000_000,
             retention_days=365,
+        ),
+        analytics=AnalyticsService(
+            guard,
+            analytics_repo,
+            default_catalog(),
+            audit,
+            tx,
+            clock=clock,
+        ),
+        reports=ReportService(
+            guard,
+            reports_repo,
+            storage,
+            audit,
+            tx,
+            clock=clock,
         ),
     )

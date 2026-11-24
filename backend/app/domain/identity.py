@@ -43,6 +43,12 @@ class AuditAction(StrEnum):
     POSE_COMPLETED = "pose.completed"
     POSE_NEEDS_REVIEW = "pose.needs_review"
     POSE_FAILED = "pose.failed"
+    REPORT_REQUESTED = "report.requested"
+    REPORT_GENERATED = "report.generated"
+    REPORT_FAILED = "report.failed"
+    REPORT_DOWNLOADED = "report.downloaded"
+    ANALYTICS_VIEWED = "analytics.viewed"
+    DASHBOARD_VIEWED = "dashboard.viewed"
 
 
 MIN_PASSWORD_LENGTH = 10
